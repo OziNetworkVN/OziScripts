@@ -75,6 +75,26 @@ ozi system swap resize       # Change swap size
 - fallocate utility
 - mkswap command
 
+
+---
+
+### update.sh - System Self-Update
+
+**File:** `modules/system/update.sh`  
+**Purpose:** Check and update Ozi Script from Git
+
+**Commands:**
+```bash
+ozi system update check             # Check for new version
+ozi system update apply             # Apply update
+```
+
+**Features:**
+- Git-based update mechanism
+- Automated pre-update backup of Ozi Script directory
+- Rollback functionality on failure
+- Permission preservation after update
+
 ---
 
 ## Stack Modules
@@ -104,6 +124,7 @@ ozi php info                        # Show PHP information
 **Features:**
 - Install multiple PHP versions side-by-side
 - Switch default CLI version
+- **RAM-aware optimization** (Dynamic pool settings)
 - Install PHP-FPM for web server
 - Install common extensions automatically
 - Manage PHP configurations
@@ -613,7 +634,7 @@ ozi site disable {domain}              # Disable site
 
 **Features:**
 - Auto-create directory structure
-- Generate Nginx config from templates
+- **Template-based Nginx config** (Laravel, WordPress, Node.js, Static)
 - Create database automatically
 - Set permissions correctly
 - Enable/disable sites
@@ -776,7 +797,7 @@ ozi backup status                    # Show backup status
 - Exclude unnecessary files
 - Database dumps (SQL format)
 - Backup listing with size/date
-- Automated scheduling (cron)
+- **Automated scheduling via Cronjob** (Daily/Weekly)
 - Retention policies
 
 **Default Behavior:**
@@ -980,14 +1001,14 @@ ozi deploy wordpress backup myblog.com
 
 | Category | Count | Modules |
 |----------|-------|---------|
-| System | 2 | info, swap |
+| System | 3 | info, swap, update |
 | Stack | 8 | php, nginx, mysql, postgresql, redis, nodejs, composer, supervisor |
 | Security | 3 | firewall, ssh, fail2ban |
 | Site | 2 | manage, cloudflare |
 | Database | 1 | admin |
 | Backup | 1 | local |
 | Deploy | 3 | laravel, nodejs, wordpress |
-| **Total** | **20** | - |
+| **Total** | **21** | - |
 
 ---
 

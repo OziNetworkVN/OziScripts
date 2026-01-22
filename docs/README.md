@@ -112,11 +112,12 @@ Complete documentation of all helper functions:
 ### 4. `docs/MODULE_CATALOG.md` ✅
 **Complete Module Reference (15,000+ words)**
 
-Detailed documentation for all 20 modules:
+Detailed documentation for all 21 modules:
 
-**System Modules (2):**
+**System Modules (3):**
 - info.sh - System information display
 - swap.sh - Swap space management
+- update.sh - System self-update
 
 **Stack Modules (8):**
 - php.sh - Multi-PHP (7.4, 8.1, 8.2, 8.3, 8.4)
@@ -523,7 +524,7 @@ For help:
 - **Ozi Script Version:** 1.0.0
 - **Documentation Version:** 1.0.0
 - **Generation Date:** 2026-01-23
-- **Total Modules:** 20
+- **Total Modules:** 21
 - **Total Functions:** 100+
 - **Total Commands:** 50+
 

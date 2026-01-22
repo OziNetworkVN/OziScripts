@@ -16,12 +16,13 @@
 ## Giai đoạn 3: System Modules ✅
 - [x] Module: System Info (thống kê VPS)
 - [x] Module: Swap Management
+- [x] Module: System Self-Update (Git-based)
 - [x] Module: Firewall (UFW)
 - [x] Module: SSH Security (disable root, SSH key)
 - [x] Module: Fail2ban
 
 ## Giai đoạn 4: Stack Installation ✅
-- [x] Module: Multi-PHP (7.4, 8.1, 8.2, 8.3, 8.4)
+- [x] Module: Multi-PHP (Tối ưu RAM tự động)
 - [x] Module: Nginx Installation & Config
 - [x] Module: PostgreSQL
 - [x] Module: MySQL/MariaDB
@@ -32,7 +33,7 @@
 
 ## Giai đoạn 5: Site Management ✅
 - [x] Module: Tạo/Xoá/List site
-- [x] Nginx templates (Laravel, WordPress, Node.js)
+- [x] Nginx templates (Laravel, WordPress, Node.js, Static)
 
 ## Giai đoạn 6: SSL & Domain ✅
 - [x] Module: Cloudflare API Integration (SSL 15 năm)
@@ -41,7 +42,7 @@
 - [x] Module: Adminer
 
 ## Giai đoạn 8: Backup ✅
-- [x] Module: Full Backup (files + DB)
+- [x] Module: Full Backup (Hỗ trợ Cronjob tự động)
 - [x] Module: Restore Backup
 
 ## Giai đoạn 9: Deploy Tools ✅
@@ -49,22 +50,22 @@
 - [x] Module: Deploy script cho Node.js
 - [x] Module: Deploy script cho WordPress
 
-## Giai đoạn 10: Testing 🔄
-- [ ] Testing trên VPS Debian 12/13
+## Giai đoạn 10: Testing ✅
+- [x] Testing trên VPS Debian 12/13
 - [x] TESTING.md - Hướng dẫn test chi tiết
 
 ---
 
-## Tổng kết: 20 modules đã hoàn thành
+## Tổng kết: 21 modules đã hoàn thành
 
 | Thư mục | Files |
 |---------|-------|
 | `core/` | colors.sh, helpers.sh, config.sh, os.sh, menu.sh |
-| `modules/system/` | info.sh, swap.sh |
+| `modules/system/` | info.sh, swap.sh, update.sh |
 | `modules/stack/` | php.sh, nginx.sh, postgresql.sh, mysql.sh, redis.sh, nodejs.sh, composer.sh, supervisor.sh |
 | `modules/site/` | manage.sh, cloudflare.sh |
 | `modules/security/` | firewall.sh, ssh.sh, fail2ban.sh |
 | `modules/database/` | admin.sh |
 | `modules/backup/` | local.sh |
 | `modules/deploy/` | laravel.sh, nodejs.sh, wordpress.sh |
-| `templates/nginx/` | laravel.conf, laravel-octane.conf, wordpress.conf, nodejs.conf |
+| `templates/nginx/` | laravel.conf, laravel-octane.conf, wordpress.conf, nodejs.conf, static.conf, cloudflare-ssl.conf |
