@@ -160,6 +160,63 @@ show_disk_info() {
     echo ""
 }
 
+# Đổi Hostname
+change_hostname() {
+    print_header "ĐỔI HOSTNAME"
+
+    local current_hostname=$(get_hostname)
+    echo -e "  Hostname hiện tại: ${BOLD_CYAN}${current_hostname}${NC}"
+    echo ""
+
+    local new_hostname=$(read_input "Nhập hostname mới")
+
+    if [[ -z "$new_hostname" ]]; then
+        print_error "Hostname không được để trống"
+        return 1
+    fi
+
+    hostnamectl set-hostname "$new_hostname"
+
+    # Update /etc/hosts
+    if grep -q "127.0.0.1.*$current_hostname" /etc/hosts; then
+        sed -i "s/127.0.0.1.*$current_hostname/127.0.0.1 $new_hostname/" /etc/hosts
+    else
+        echo "127.0.0.1 $new_hostname" >> /etc/hosts
+    fi
+
+    print_success "Hostname đã được đổi thành '$new_hostname'"
+    log_info "Changed hostname to: $new_hostname"
+}
+
+# Đổi Timezone
+change_timezone() {
+    print_header "ĐỔI TIMEZONE"
+
+    local current_timezone=$(timedatectl show --property=Timezone --value)
+    echo -e "  Timezone hiện tại: ${BOLD_CYAN}${current_timezone}${NC}"
+    echo ""
+
+    local new_timezone=$(read_input "Nhập timezone (vd: Asia/Ho_Chi_Minh)" "Asia/Ho_Chi_Minh")
+
+    if [[ -z "$new_timezone" ]]; then
+        print_error "Timezone không được để trống"
+        return 1
+    fi
+
+    if timedatectl set-timezone "$new_timezone" 2>/dev/null; then
+        print_success "Timezone đã được đổi thành '$new_timezone'"
+        echo -e "  Thời gian hiện tại: $(date)"
+
+        # Update config
+        set_config "TIMEZONE" "$new_timezone"
+
+        log_info "Changed timezone to: $new_timezone"
+    else
+        print_error "Timezone không hợp lệ"
+        return 1
+    fi
+}
+
 #================================================================
 # MAIN
 #================================================================
