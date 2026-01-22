@@ -76,13 +76,30 @@ install_nodejs() {
     ln -sf "$node_path" /usr/local/bin/node
     ln -sf "$npm_path" /usr/local/bin/npm
     
-    # Install yarn and pm2 globally  
+    # Install yarn
     npm install -g yarn 2>/dev/null || true
     
+    # Install PM2 if not installed
+    if ! command_exists pm2; then
+        install_pm2
+    fi
+
     print_success "Node.js $(node -v) đã được cài đặt!"
     print_info "npm: $(npm -v)"
     
     log_info "Installed Node.js $version"
+}
+
+# Cài đặt PM2
+install_pm2() {
+    print_info "Đang cài đặt PM2..."
+
+    if npm install -g pm2; then
+        print_success "PM2 đã được cài đặt"
+        log_info "Installed PM2"
+    else
+        print_error "Không thể cài đặt PM2"
+    fi
 }
 
 # Interactive install
@@ -143,6 +160,9 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
     case "${1:-}" in
         install)
             install_nodejs "${2:-$DEFAULT_NODE_VERSION}"
+            ;;
+        pm2)
+            install_pm2
             ;;
         list)
             list_nodejs_versions

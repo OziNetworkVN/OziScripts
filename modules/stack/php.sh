@@ -297,6 +297,39 @@ remove_php() {
     log_info "Removed PHP $version"
 }
 
+# Edit PHP configuration
+edit_php_ini() {
+    local version="$1"
+
+    if [[ -z "$version" ]]; then
+        version=$(get_default_php_version)
+    fi
+
+    if [[ -z "$version" ]]; then
+        print_error "Không tìm thấy phiên bản PHP nào"
+        return 1
+    fi
+
+    local php_ini="/etc/php/${version}/fpm/php.ini"
+
+    if [[ ! -f "$php_ini" ]]; then
+        print_error "Không tìm thấy file config: $php_ini"
+        return 1
+    fi
+
+    print_info "Đang mở php.ini ($version)..."
+
+    if command_exists nano; then
+        nano "$php_ini"
+    else
+        vi "$php_ini"
+    fi
+
+    print_info "Khởi động lại PHP-FPM..."
+    systemctl restart "php${version}-fpm"
+    print_success "Đã cập nhật cấu hình PHP"
+}
+
 #================================================================
 # MAIN
 #================================================================
@@ -314,8 +347,11 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         remove)
             remove_php "${2:-}"
             ;;
+        edit)
+            edit_php_ini "${2:-}"
+            ;;
         *)
-            echo "Sử dụng: $0 {install|list|default|remove} [version]"
+            echo "Sử dụng: $0 {install|list|default|remove|edit} [version]"
             ;;
     esac
 fi

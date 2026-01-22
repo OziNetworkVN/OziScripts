@@ -174,6 +174,21 @@ reload_nginx() {
     fi
 }
 
+# Xem logs Nginx
+view_nginx_logs() {
+    local log_type="${1:-error}"
+    local log_file="/var/log/nginx/${log_type}.log"
+
+    if [[ ! -f "$log_file" ]]; then
+        print_error "Không tìm thấy file log: $log_file"
+        return 1
+    fi
+
+    print_header "NGINX ${log_type^^} LOGS (Ctrl+C để thoát)"
+    echo ""
+    tail -f "$log_file"
+}
+
 #================================================================
 # MAIN
 #================================================================
@@ -194,8 +209,11 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         test)
             test_nginx_config
             ;;
+        logs)
+            view_nginx_logs "${2:-error}"
+            ;;
         *)
-            echo "Sử dụng: $0 {install|status|restart|reload|test}"
+            echo "Sử dụng: $0 {install|status|restart|reload|test|logs}"
             ;;
     esac
 fi

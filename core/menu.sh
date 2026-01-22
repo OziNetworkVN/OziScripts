@@ -291,17 +291,19 @@ handle_system_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/system/info.sh"
+        source "$OZI_DIR/modules/system/swap.sh"
+
         case "$choice" in
-            1) 
-                source "$OZI_DIR/modules/system/info.sh"
-                show_system_overview
-                wait_enter
-                ;;
+            1) show_system_overview; wait_enter ;;
+            2) show_cpu_info; wait_enter ;;
+            3) show_ram_info; wait_enter ;;
+            4) show_disk_info; wait_enter ;;
+            5) change_hostname; wait_enter ;;
+            6) change_timezone; wait_enter ;;
+            7) manage_swap_interactive ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -312,22 +314,34 @@ handle_php_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-6]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/stack/php.sh"
+
         case "$choice" in
-            1)
-                source "$OZI_DIR/modules/stack/php.sh"
-                install_php_interactive
+            1) install_php_interactive; wait_enter ;;
+            2) list_php_versions; wait_enter ;;
+            3)
+                local version=$(read_input "Nhập version PHP (vd: 8.3)")
+                set_default_php "$version"
                 wait_enter
                 ;;
-            2)
-                source "$OZI_DIR/modules/stack/php.sh"
-                list_php_versions
+            4)
+                local version=$(read_input "Nhập version PHP muốn gỡ (vd: 8.3)")
+                remove_php "$version"
+                wait_enter
+                ;;
+            5)
+                local version=$(read_input "Nhập version PHP (để trống chọn default)" "")
+                edit_php_ini "$version"
+                wait_enter
+                ;;
+            6)
+                local version=$(read_input "Nhập version PHP (vd: 8.3)")
+                systemctl restart "php${version}-fpm"
+                print_success "Đã khởi động lại PHP-FPM"
                 wait_enter
                 ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -338,17 +352,16 @@ handle_nginx_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-5]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/stack/nginx.sh"
+
         case "$choice" in
-            1)
-                source "$OZI_DIR/modules/stack/nginx.sh"
-                install_nginx
-                wait_enter
-                ;;
+            1) install_nginx; wait_enter ;;
+            2) show_nginx_status; wait_enter ;;
+            3) restart_nginx; wait_enter ;;
+            4) test_nginx_config; wait_enter ;;
+            5) view_nginx_logs; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -359,22 +372,45 @@ handle_database_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/stack/postgresql.sh"
+        source "$OZI_DIR/modules/stack/mysql.sh"
+        source "$OZI_DIR/modules/database/admin.sh"
+        source "$OZI_DIR/modules/backup/local.sh"
+
         case "$choice" in
-            1)
-                source "$OZI_DIR/modules/stack/postgresql.sh"
-                install_postgresql
+            1) install_postgresql; wait_enter ;;
+            2) install_mysql; wait_enter ;;
+            3)
+                local action=$(read_input "Nhập 'create', 'list' hoặc 'drop'" "list")
+                case "$action" in
+                    create)
+                        local db=$(read_input "Tên Database")
+                        create_database "$db"
+                        ;;
+                    drop)
+                        local db=$(read_input "Tên Database")
+                        drop_database "$db"
+                        ;;
+                    *) list_databases ;;
+                esac
                 wait_enter
                 ;;
-            2)
-                source "$OZI_DIR/modules/stack/mysql.sh"
-                install_mysql
+            4)
+                local action=$(read_input "Nhập 'create' hoặc 'list'" "list")
+                case "$action" in
+                    create)
+                        local db=$(read_input "Tên Database")
+                        create_mysql_database "$db"
+                        ;;
+                    *) list_mysql_databases ;;
+                esac
                 wait_enter
                 ;;
+            5) install_adminer; wait_enter ;;
+            6) create_db_backup; wait_enter ;;
+            7) restore_backup; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -385,22 +421,29 @@ handle_website_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-5]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/site/manage.sh"
+
         case "$choice" in
-            1)
-                source "$OZI_DIR/modules/site/manage.sh"
-                create_site_interactive
+            1) create_site_interactive; wait_enter ;;
+            2) list_sites; wait_enter ;;
+            3)
+                local domain=$(read_input "Nhập domain cần xoá")
+                delete_site "$domain"
                 wait_enter
                 ;;
-            2)
-                source "$OZI_DIR/modules/site/manage.sh"
-                list_sites
+            4)
+                local action=$(read_input "Nhập 'enable' hoặc 'disable'" "enable")
+                local domain=$(read_input "Nhập domain")
+                if [[ "$action" == "disable" ]]; then
+                    disable_site "$domain"
+                else
+                    enable_site "$domain"
+                fi
                 wait_enter
                 ;;
+            5) view_site_logs; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -411,22 +454,17 @@ handle_ssl_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-5]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/site/cloudflare.sh"
+        source "$OZI_DIR/modules/site/letsencrypt.sh"
+
         case "$choice" in
-            1)
-                source "$OZI_DIR/modules/site/cloudflare.sh"
-                install_cloudflare_ssl_interactive
-                wait_enter
-                ;;
-            5)
-                source "$OZI_DIR/modules/site/cloudflare.sh"
-                configure_cloudflare_api
-                wait_enter
-                ;;
+            1) install_cloudflare_ssl_interactive; wait_enter ;;
+            2) install_letsencrypt_ssl; wait_enter ;;
+            3) list_ssl_certs; wait_enter ;;
+            4) renew_ssl_certs; wait_enter ;;
+            5) configure_cloudflare_api; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -437,12 +475,20 @@ handle_security_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/security/firewall.sh"
+        source "$OZI_DIR/modules/security/ssh.sh"
+        source "$OZI_DIR/modules/security/fail2ban.sh"
+
         case "$choice" in
+            1) install_firewall; wait_enter ;;
+            2) manage_ports_interactive ;;
+            3) add_ssh_key; wait_enter ;;
+            4) disable_root_login; wait_enter ;;
+            5) change_ssh_port; wait_enter ;;
+            6) install_fail2ban; wait_enter ;;
+            7) auto_harden_ssh; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -453,12 +499,17 @@ handle_backup_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-6]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/backup/local.sh"
+
         case "$choice" in
+            1) create_full_backup; wait_enter ;;
+            2) create_db_backup; wait_enter ;;
+            3) list_backups; wait_enter ;;
+            4) restore_backup ""; wait_enter ;;
+            5) print_warning "Chức năng đang phát triển..."; wait_enter ;;
+            6) print_warning "Chức năng đang phát triển..."; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -469,12 +520,17 @@ handle_deploy_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-4]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/deploy/laravel.sh"
+        source "$OZI_DIR/modules/deploy/nodejs.sh"
+        source "$OZI_DIR/modules/deploy/wordpress.sh"
+
         case "$choice" in
+            1) deploy_laravel_interactive; wait_enter ;;
+            2) deploy_nodejs_interactive; wait_enter ;;
+            3) install_wordpress_interactive; wait_enter ;;
+            4) print_warning "Chức năng đang phát triển..."; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }
@@ -485,32 +541,23 @@ handle_extras_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
         
+        source "$OZI_DIR/modules/stack/nodejs.sh"
+        source "$OZI_DIR/modules/stack/redis.sh"
+        source "$OZI_DIR/modules/stack/supervisor.sh"
+        source "$OZI_DIR/modules/stack/composer.sh"
+        source "$OZI_DIR/modules/stack/certbot.sh"
+        source "$OZI_DIR/modules/stack/ffmpeg.sh"
+
         case "$choice" in
-            1)
-                source "$OZI_DIR/modules/stack/nodejs.sh"
-                install_nodejs_interactive
-                wait_enter
-                ;;
-            2)
-                source "$OZI_DIR/modules/stack/redis.sh"
-                install_redis
-                wait_enter
-                ;;
-            3)
-                source "$OZI_DIR/modules/stack/supervisor.sh"
-                install_supervisor
-                wait_enter
-                ;;
-            5)
-                source "$OZI_DIR/modules/stack/composer.sh"
-                install_composer
-                wait_enter
-                ;;
+            1) install_nodejs_interactive; wait_enter ;;
+            2) install_redis; wait_enter ;;
+            3) install_supervisor; wait_enter ;;
+            4) install_pm2; wait_enter ;;
+            5) install_composer; wait_enter ;;
+            6) install_certbot; wait_enter ;;
+            7) install_ffmpeg; wait_enter ;;
             0) return ;;
-            *)
-                print_warning "Chức năng đang phát triển..."
-                wait_enter
-                ;;
+            *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
     done
 }

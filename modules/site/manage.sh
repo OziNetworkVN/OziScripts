@@ -341,6 +341,69 @@ delete_site() {
     log_info "Deleted site: $domain"
 }
 
+# Enable website
+enable_site() {
+    local domain="$1"
+
+    if [[ ! -f "$NGINX_SITES_AVAILABLE/$domain" ]]; then
+        print_error "Website '$domain' không tồn tại"
+        return 1
+    fi
+
+    if [[ -L "$NGINX_SITES_ENABLED/$domain" ]]; then
+        print_warning "Website '$domain' đã được enable"
+        return 0
+    fi
+
+    ln -sf "$NGINX_SITES_AVAILABLE/$domain" "$NGINX_SITES_ENABLED/$domain"
+    nginx -t && systemctl reload nginx
+
+    print_success "Website '$domain' đã được enable"
+}
+
+# Disable website
+disable_site() {
+    local domain="$1"
+
+    if [[ ! -L "$NGINX_SITES_ENABLED/$domain" ]]; then
+        print_warning "Website '$domain' chưa được enable"
+        return 0
+    fi
+
+    rm -f "$NGINX_SITES_ENABLED/$domain"
+    nginx -t && systemctl reload nginx
+
+    print_success "Website '$domain' đã được disable"
+}
+
+# Xem logs website
+view_site_logs() {
+    local domain="$1"
+    local log_type="${2:-error}" # access or error
+
+    if [[ -z "$domain" ]]; then
+        # Interactive selection
+        list_sites
+        domain=$(read_input "Nhập domain")
+    fi
+
+    if [[ ! -d "$WWW_DIR/$domain/logs" ]]; then
+        print_error "Không tìm thấy logs cho website '$domain'"
+        return 1
+    fi
+
+    local log_file="$WWW_DIR/$domain/logs/${log_type}.log"
+
+    if [[ ! -f "$log_file" ]]; then
+        print_error "Không tìm thấy file log: $log_file"
+        return 1
+    fi
+
+    print_header "WEBSITE LOGS: $domain ($log_type)"
+    echo ""
+    tail -f "$log_file"
+}
+
 #================================================================
 # MAIN
 #================================================================
@@ -354,6 +417,15 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
             ;;
         delete)
             delete_site "${2:-}"
+            ;;
+        enable)
+            enable_site "${2:-}"
+            ;;
+        disable)
+            disable_site "${2:-}"
+            ;;
+        logs)
+            view_site_logs "${2:-}" "${3:-error}"
             ;;
         *)
             create_site_interactive
