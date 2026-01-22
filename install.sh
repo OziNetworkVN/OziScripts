@@ -79,6 +79,15 @@ check_debian() {
     print_success "Hệ điều hành: Debian $version"
 }
 
+install_dependencies() {
+    print_info "Đang cài đặt các thành phần phụ thuộc..."
+    
+    apt-get update -qq
+    apt-get install -y -qq curl git gnupg2 ca-certificates lsb-release tar gzip
+    
+    print_success "Các thành phần phụ thuộc đã được cài đặt"
+}
+
 install_files() {
     print_info "Đang cài đặt Ozi Script..."
     
@@ -170,6 +179,7 @@ main() {
     print_banner
     check_root
     check_debian
+    install_dependencies
     echo ""
     install_files
     set_permissions

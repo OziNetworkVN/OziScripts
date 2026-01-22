@@ -132,7 +132,7 @@ install_php() {
     return 0
 }
 
-# Tối ưu cấu hình PHP-FPM
+# Tối ưu cấu hình PHP-FPM dựa trên RAM thực tế
 optimize_php_fpm() {
     local version="$1"
     local fpm_conf="/etc/php/${version}/fpm/pool.d/www.conf"
@@ -142,21 +142,60 @@ optimize_php_fpm() {
         return 0
     fi
     
-    print_info "Đang tối ưu cấu hình PHP ${version}..."
+    # Lấy thông số RAM (MB)
+    local total_ram=$(free -m | awk '/^Mem:/{print $2}')
+    print_info "Đang tối ưu cấu hình PHP ${version} cho VPS (${total_ram}MB RAM)..."
+    
+    # Tính toán thông số
+    local mem_limit="128M"
+    local max_children=5
+    local start_servers=2
+    local min_spare=2
+    local max_spare=4
+    
+    if [[ "$total_ram" -le 1024 ]]; then
+        # VPS < 1GB
+        mem_limit="128M"
+        max_children=10
+        start_servers=2
+        min_spare=2
+        max_spare=4
+    elif [[ "$total_ram" -le 2048 ]]; then
+        # VPS 2GB
+        mem_limit="256M"
+        max_children=25
+        start_servers=4
+        min_spare=4
+        max_spare=8
+    elif [[ "$total_ram" -le 4096 ]]; then
+        # VPS 4GB
+        mem_limit="512M"
+        max_children=50
+        start_servers=8
+        min_spare=8
+        max_spare=16
+    else
+        # VPS > 4GB
+        mem_limit="1024M"
+        max_children=100
+        start_servers=16
+        min_spare=16
+        max_spare=32
+    fi
     
     # Backup original
     cp "$fpm_conf" "${fpm_conf}.backup"
     cp "$php_ini" "${php_ini}.backup"
     
     # Optimize FPM pool
-    sed -i 's/^pm = .*/pm = dynamic/' "$fpm_conf"
-    sed -i 's/^pm.max_children = .*/pm.max_children = 50/' "$fpm_conf"
-    sed -i 's/^pm.start_servers = .*/pm.start_servers = 5/' "$fpm_conf"
-    sed -i 's/^pm.min_spare_servers = .*/pm.min_spare_servers = 5/' "$fpm_conf"
-    sed -i 's/^pm.max_spare_servers = .*/pm.max_spare_servers = 15/' "$fpm_conf"
+    sed -i "s/^pm = .*/pm = dynamic/" "$fpm_conf"
+    sed -i "s/^pm.max_children = .*/pm.max_children = ${max_children}/" "$fpm_conf"
+    sed -i "s/^pm.start_servers = .*/pm.start_servers = ${start_servers}/" "$fpm_conf"
+    sed -i "s/^pm.min_spare_servers = .*/pm.min_spare_servers = ${min_spare}/" "$fpm_conf"
+    sed -i "s/^pm.max_spare_servers = .*/pm.max_spare_servers = ${max_spare}/" "$fpm_conf"
     
     # Optimize php.ini
-    sed -i 's/^memory_limit = .*/memory_limit = 512M/' "$php_ini"
+    sed -i "s/^memory_limit = .*/memory_limit = ${mem_limit}/" "$php_ini"
     sed -i 's/^upload_max_filesize = .*/upload_max_filesize = 100M/' "$php_ini"
     sed -i 's/^post_max_size = .*/post_max_size = 100M/' "$php_ini"
     sed -i 's/^max_execution_time = .*/max_execution_time = 300/' "$php_ini"

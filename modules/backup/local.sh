@@ -161,6 +161,54 @@ cleanup_old_backups() {
 }
 
 #================================================================
+# AUTOMATED BACKUP (CRONJOB)
+#================================================================
+
+# Cấu hình backup tự động
+configure_auto_backup() {
+    print_header "CẤU HÌNH BACKUP TỰ ĐỘNG"
+    
+    echo "  Lựa chọn tần suất:"
+    echo ""
+    print_menu_item "1" "Hàng ngày (03:00 AM)"
+    print_menu_item "2" "Hàng tuần (03:00 AM Chủ Nhật)"
+    print_menu_item "3" "Tắt backup tự động"
+    echo ""
+    
+    local choice=$(read_input "Chọn [1-3]")
+    
+    case "$choice" in
+        1)
+            remove_auto_backup_silent
+            (crontab -l 2>/dev/null; echo "0 3 * * * $OZI_DIR/ozi backup full > /dev/null 2>&1") | crontab -
+            print_success "Đã bật backup hàng ngày"
+            ;;
+        2)
+            remove_auto_backup_silent
+            (crontab -l 2>/dev/null; echo "0 3 * * 0 $OZI_DIR/ozi backup full > /dev/null 2>&1") | crontab -
+            print_success "Đã bật backup hàng tuần"
+            ;;
+        3)
+            remove_auto_backup
+            ;;
+        *)
+            print_error "Lựa chọn không hợp lệ"
+            ;;
+    esac
+}
+
+# Gỡ backup tự động
+remove_auto_backup() {
+    print_info "Đang tắt backup tự động..."
+    remove_auto_backup_silent
+    print_success "Đã tắt backup tự động"
+}
+
+remove_auto_backup_silent() {
+    crontab -l 2>/dev/null | grep -v "$OZI_DIR/ozi backup full" | crontab -
+}
+
+#================================================================
 # RESTORE FUNCTIONS
 #================================================================
 
@@ -173,6 +221,10 @@ restore_backup() {
         list_backups
         local backup_name=$(read_input "Nhập tên file backup (hoặc số thứ tự)")
         
+        if [[ -z "$backup_name" ]]; then
+            return 0
+        fi
+
         if [[ "$backup_name" =~ ^[0-9]+$ ]]; then
             backup_file=$(ls -t "$BACKUP_DIR"/*.tar.gz 2>/dev/null | sed -n "${backup_name}p")
         else
@@ -201,7 +253,8 @@ restore_backup() {
     local temp_dir=$(mktemp -d)
     tar -xzf "$backup_file" -C "$temp_dir"
     
-    local backup_content=$(ls "$temp_dir")
+    # Check if the structure is correct
+    local backup_content=$(ls "$temp_dir" | head -1)
     local backup_path="$temp_dir/$backup_content"
     
     # Restore websites
@@ -229,16 +282,17 @@ restore_backup() {
     # Restore PostgreSQL
     if [[ -f "$backup_path/postgresql.sql.gz" ]] && is_service_running "postgresql"; then
         print_info "Restore PostgreSQL databases..."
-        gunzip -c "$backup_path/postgresql.sql.gz" | sudo -u postgres psql
+        gunzip -c "$backup_path/postgresql.sql.gz" | sudo -u postgres psql >/dev/null 2>&1
         print_success "PostgreSQL đã được restore"
     fi
     
     # Restore MySQL
     if [[ -f "$backup_path/mysql.sql.gz" ]] && (is_service_running "mariadb" || is_service_running "mysql"); then
         print_info "Restore MySQL databases..."
-        local mysql_pass=$(get_mysql_root_password 2>/dev/null)
+        source "$OZI_DIR/modules/stack/mysql.sh"
+        local mysql_pass=$(get_mysql_root_password)
         if [[ -n "$mysql_pass" ]]; then
-            gunzip -c "$backup_path/mysql.sql.gz" | mysql -u root -p"$mysql_pass"
+            gunzip -c "$backup_path/mysql.sql.gz" | mysql -u root -p"$mysql_pass" >/dev/null 2>&1
             print_success "MySQL đã được restore"
         fi
     fi
@@ -270,8 +324,11 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
         cleanup)
             cleanup_old_backups
             ;;
+        auto)
+            configure_auto_backup
+            ;;
         *)
-            echo "Sử dụng: $0 {full|db|list|restore|cleanup}"
+            echo "Sử dụng: $0 {full|db|list|restore|cleanup|auto}"
             ;;
     esac
 fi

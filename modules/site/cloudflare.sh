@@ -129,9 +129,15 @@ update_nginx_ssl() {
     local domain="$1"
     local ssl_dir="$SSL_DIR/$domain"
     local nginx_conf="$NGINX_SITES_AVAILABLE/$domain"
+    local template_file="$OZI_DIR/templates/nginx/cloudflare-ssl.conf"
     
     if [[ ! -f "$nginx_conf" ]]; then
         print_error "Nginx config cho $domain không tồn tại"
+        return 1
+    fi
+    
+    if [[ ! -f "$template_file" ]]; then
+        print_error "Không tìm thấy template: cloudflare-ssl.conf"
         return 1
     fi
     
@@ -140,63 +146,16 @@ update_nginx_ssl() {
     # Backup original
     cp "$nginx_conf" "${nginx_conf}.backup"
     
-    # Create new config with SSL
-    local root_dir=$(grep -oP 'root \K[^;]+' "$nginx_conf" | head -1)
+    # Lấy thông số từ config cũ
+    local root_dir=$(grep -oP 'root \K[^;]+' "$nginx_conf" | head -1 | sed 's|/public||')
     local php_version=$(grep -oP 'php\K[0-9.]+' "$nginx_conf" | head -1)
+    [[ -z "$php_version" ]] && php_version="8.3"
     
-    cat > "$nginx_conf" << EOF
-# HTTP -> HTTPS redirect
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $domain www.$domain;
-    return 301 https://\$server_name\$request_uri;
-}
-
-# HTTPS server
-server {
-    listen 443 ssl http2;
-    listen [::]:443 ssl http2;
-    server_name $domain www.$domain;
-    
-    # SSL Cloudflare Origin Certificate
-    ssl_certificate $ssl_dir/cert.pem;
-    ssl_certificate_key $ssl_dir/key.pem;
-    
-    # SSL Settings
-    include snippets/ssl-params.conf;
-    include snippets/security-headers.conf;
-    add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
-    
-    root ${root_dir:-$WWW_DIR/$domain/public};
-    index index.php index.html;
-    
-    access_log $WWW_DIR/$domain/logs/access.log;
-    error_log $WWW_DIR/$domain/logs/error.log;
-    
-    client_max_body_size 100M;
-    
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-    
-    location ~ \.php\$ {
-        fastcgi_pass unix:/run/php/php${php_version:-8.3}-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        include fastcgi_params;
-        fastcgi_hide_header X-Powered-By;
-    }
-    
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2|woff|ttf|svg|webp)\$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    location ~ /\.(?!well-known) {
-        deny all;
-    }
-}
-EOF
+    # Replace markers in template
+    sed "s|{domain}|$domain|g; 
+         s|{root}|${root_dir:-$WWW_DIR/$domain}|g;
+         s|{php_version}|$php_version|g;
+         s|{ssl_dir}|$ssl_dir|g" "$template_file" > "$nginx_conf"
     
     # Test and reload
     if nginx -t 2>/dev/null; then

@@ -25,6 +25,11 @@ create_site() {
         return 1
     fi
     
+    if ! is_installed "nginx"; then
+        print_error "Nginx chưa được cài đặt. Vui lòng cài đặt Nginx trước."
+        return 1
+    fi
+    
     print_header "TẠO WEBSITE: $domain"
     
     # Create directories
@@ -81,160 +86,54 @@ create_site() {
     fi
 }
 
+# Tạo Nginx config từ template
+generate_nginx_config() {
+    local template_name="$1"
+    local domain="$2"
+    local php_version="${3:-}"
+    local port="${4:-}"
+    
+    local template_file="$OZI_DIR/templates/nginx/${template_name}.conf"
+    local target_file="$NGINX_SITES_AVAILABLE/$domain"
+    
+    if [[ ! -f "$template_file" ]]; then
+        print_error "Không tìm thấy template: $template_name"
+        return 1
+    fi
+    
+    # Tạo slug cho domain (xoá dấu chấm)
+    local domain_slug=$(echo "$domain" | sed 's/\./_/g')
+    local site_root="$WWW_DIR/$domain"
+    
+    # Read template and replace markers
+    sed "s|{domain}|$domain|g; 
+         s|{domain_slug}|$domain_slug|g;
+         s|{root}|$site_root|g;
+         s|{php_version}|$php_version|g;
+         s|{port}|$port|g" "$template_file" > "$target_file"
+    
+    return 0
+}
+
 # Tạo Nginx config cho Laravel
 create_laravel_nginx_config() {
-    local domain="$1"
-    local php_version="$2"
-    
-    cat > "$NGINX_SITES_AVAILABLE/$domain" << EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $domain www.$domain;
-    
-    root $WWW_DIR/$domain/public;
-    index index.php index.html;
-    
-    access_log $WWW_DIR/$domain/logs/access.log;
-    error_log $WWW_DIR/$domain/logs/error.log;
-    
-    # Security headers
-    include snippets/security-headers.conf;
-    
-    # Max upload
-    client_max_body_size 100M;
-    
-    # Gzip
-    gzip on;
-    gzip_types text/plain text/css application/json application/javascript text/xml application/xml;
-    
-    location / {
-        try_files \$uri \$uri/ /index.php?\$query_string;
-    }
-    
-    location ~ \.php\$ {
-        fastcgi_pass unix:/run/php/php${php_version}-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        include fastcgi_params;
-        fastcgi_hide_header X-Powered-By;
-    }
-    
-    # Static files
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2|woff|ttf|svg|webp)\$ {
-        expires 30d;
-        add_header Cache-Control "public, immutable";
-    }
-    
-    # Block sensitive files
-    location ~ /\.(?!well-known) {
-        deny all;
-    }
-}
-EOF
+    generate_nginx_config "laravel" "$1" "$2"
 }
 
 # Tạo Nginx config cho WordPress
 create_wordpress_nginx_config() {
-    local domain="$1"
-    local php_version="$2"
-    
-    cat > "$NGINX_SITES_AVAILABLE/$domain" << EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $domain www.$domain;
-    
-    root $WWW_DIR/$domain/public;
-    index index.php index.html;
-    
-    access_log $WWW_DIR/$domain/logs/access.log;
-    error_log $WWW_DIR/$domain/logs/error.log;
-    
-    client_max_body_size 100M;
-    
-    location / {
-        try_files \$uri \$uri/ /index.php?\$args;
-    }
-    
-    location ~ \.php\$ {
-        fastcgi_pass unix:/run/php/php${php_version}-fpm.sock;
-        fastcgi_param SCRIPT_FILENAME \$realpath_root\$fastcgi_script_name;
-        include fastcgi_params;
-    }
-    
-    # WP Admin protection
-    location /wp-admin {
-        try_files \$uri \$uri/ /index.php?\$args;
-    }
-    
-    # Block xmlrpc
-    location = /xmlrpc.php {
-        deny all;
-    }
-    
-    # Static files
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2)\$ {
-        expires 30d;
-    }
-    
-    location ~ /\.(?!well-known) {
-        deny all;
-    }
-}
-EOF
+    generate_nginx_config "wordpress" "$1" "$2"
 }
 
 # Tạo Nginx config cho Node.js
 create_nodejs_nginx_config() {
-    local domain="$1"
-    local port="${2:-3000}"
-    
-    cat > "$NGINX_SITES_AVAILABLE/$domain" << EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $domain www.$domain;
-    
-    access_log $WWW_DIR/$domain/logs/access.log;
-    error_log $WWW_DIR/$domain/logs/error.log;
-    
-    location / {
-        proxy_pass http://127.0.0.1:${port};
-        proxy_http_version 1.1;
-        proxy_set_header Upgrade \$http_upgrade;
-        proxy_set_header Connection 'upgrade';
-        proxy_set_header Host \$host;
-        proxy_set_header X-Real-IP \$remote_addr;
-        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto \$scheme;
-        proxy_cache_bypass \$http_upgrade;
-    }
-}
-EOF
+    local port=$(read_input "Nhập port app đang chạy" "3000")
+    generate_nginx_config "nodejs" "$1" "" "$port"
 }
 
 # Tạo Nginx config cho Static
 create_static_nginx_config() {
-    local domain="$1"
-    
-    cat > "$NGINX_SITES_AVAILABLE/$domain" << EOF
-server {
-    listen 80;
-    listen [::]:80;
-    server_name $domain www.$domain;
-    
-    root $WWW_DIR/$domain/public;
-    index index.html;
-    
-    location / {
-        try_files \$uri \$uri/ /index.html;
-    }
-    
-    location ~* \.(jpg|jpeg|png|gif|ico|css|js|woff2)\$ {
-        expires 30d;
-    }
-}
-EOF
+    generate_nginx_config "static" "$1"
 }
 
 # Interactive create site

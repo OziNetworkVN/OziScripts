@@ -285,7 +285,8 @@ handle_main_menu() {
     done
 }
 
-# Placeholder handlers cho các submenu (sẽ được implement sau)
+# Handler menu hệ thống
+handle_system_menu() {
     while true; do
         menu_system_info
         echo ""
@@ -511,7 +512,7 @@ handle_backup_menu() {
             2) create_db_backup; wait_enter ;;
             3) list_backups; wait_enter ;;
             4) restore_backup ""; wait_enter ;;
-            5) print_warning "Chức năng đang phát triển..."; wait_enter ;;
+            5) configure_auto_backup; wait_enter ;;
             6) print_warning "Chức năng đang phát triển..."; wait_enter ;;
             0) return ;;
             *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
