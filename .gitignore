@@ -1,0 +1,85 @@
+# IDE & Editor
+.vscode/
+.idea/
+*.sublime-project
+*.sublime-workspace
+.vim/
+*.swp
+*.swo
+*~
+
+# OS Files
+.DS_Store
+Thumbs.db
+.directory
+*.lnk
+
+# Runtime & Logs
+*.log
+*.pid
+/var/log/oziscript/*
+!var/log/oziscript/.gitkeep
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# Dependencies
+node_modules/
+venv/
+.venv/
+__pycache__/
+*.pyc
+
+# Temporary Files
+*.tmp
+*.temp
+*.swp
+.~*
+
+# Backups
+*.backup
+*.bak
+*.orig
+
+# Build & Dist
+dist/
+build/
+*.o
+*.a
+*.so
+
+# Test Coverage
+coverage/
+.nyc_output/
+.coverage
+htmlcov/
+
+# Git
+.git/
+.gitmodules
+
+# Project Specific
+/var/backups/oziscript/*
+!var/backups/oziscript/.gitkeep
+/etc/oziscript/*
+!etc/oziscript/.gitkeep
+
+# IDE generated
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+
+# macOS
+.AppleDB
+.AppleDesktop
+Network Trash Folder
+Temporary Items
+.apdisk
