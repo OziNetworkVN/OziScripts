@@ -80,6 +80,7 @@ menu_system_info() {
     print_menu_item "5" "Đổi Hostname"
     print_menu_item "6" "Đổi Timezone"
     print_menu_item "7" "Quản lý Swap"
+    print_menu_item "8" "Kiểm tra cập nhật script"
     
     print_menu_back
 }
@@ -285,11 +286,10 @@ handle_main_menu() {
 }
 
 # Placeholder handlers cho các submenu (sẽ được implement sau)
-handle_system_menu() {
     while true; do
         menu_system_info
         echo ""
-        read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
+        read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-8]: ${NC}")" choice
         
         source "$OZI_DIR/modules/system/info.sh"
         source "$OZI_DIR/modules/system/swap.sh"
@@ -302,6 +302,11 @@ handle_system_menu() {
             5) change_hostname; wait_enter ;;
             6) change_timezone; wait_enter ;;
             7) manage_swap_interactive ;;
+            8)
+                source "$OZI_DIR/modules/system/update.sh"
+                update_script
+                wait_enter
+                ;;
             0) return ;;
             *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
