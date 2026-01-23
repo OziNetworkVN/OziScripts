@@ -4,7 +4,7 @@
 # Mô tả: CLI chính để quản lý VPS
 # Sử dụng: ozi [command]
 # Tác giả: Ozi DevOps
-# Phiên bản: 1.0.2
+# Phiên bản: 1.0.3
 #================================================================
 
 set -euo pipefail
@@ -13,7 +13,7 @@ set -euo pipefail
 # CONFIGURATION
 #================================================================
 OZI_DIR="${OZI_DIR:-/opt/oziscript}"
-OZI_VERSION="1.0.2"
+OZI_VERSION="1.0.3"
 
 #================================================================
 # LOAD CORE MODULES
@@ -29,14 +29,6 @@ source "$OZI_DIR/core/config.sh"
 source "$OZI_DIR/core/os.sh"
 source "$OZI_DIR/core/menu.sh"
 
-# Auto-check for updates (only when running menu)
-if [[ "${1:-menu}" == "menu" || -z "${1:-}" ]]; then
-    if [[ -f "$OZI_DIR/modules/system/update.sh" ]]; then
-        source "$OZI_DIR/modules/system/update.sh"
-        auto_update_check
-    fi
-fi
-
 #================================================================
 # VALIDATION
 #================================================================
@@ -49,6 +41,14 @@ validate_os
 
 # Khởi tạo config
 init_config
+
+# Auto-check for updates (only when running menu, with error handling)
+if [[ "${1:-menu}" == "menu" || -z "${1:-}" ]]; then
+    if [[ -f "$OZI_DIR/modules/system/update.sh" ]]; then
+        source "$OZI_DIR/modules/system/update.sh" 2>/dev/null || true
+        auto_update_check 2>/dev/null || true
+    fi
+fi
 
 #================================================================
 # COMMAND HANDLERS

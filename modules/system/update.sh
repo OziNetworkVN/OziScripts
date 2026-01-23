@@ -83,13 +83,19 @@ check_for_updates() {
 
 # Tự động cập nhật (gọi khi khởi động)
 auto_update_check() {
-    # Kiểm tra silent mode
-    check_for_updates true
+    # Kiểm tra silent mode - không hiển thị lỗi
+    check_for_updates true 2>/dev/null
     local status=$?
     
     if [[ $status -eq 2 ]]; then
         # Có bản cập nhật mới
-        local remote_version=$(get_remote_version)
+        local remote_version=$(get_remote_version 2>/dev/null)
+        
+        if [[ -z "$remote_version" ]]; then
+            # Không lấy được version, bỏ qua
+            return 0
+        fi
+        
         echo ""
         print_warning "⚠ Phát hiện phiên bản mới: v${remote_version} (hiện tại: v${OZI_VERSION})"
         echo ""
@@ -97,7 +103,7 @@ auto_update_check() {
         if confirm "Bạn có muốn cập nhật ngay bây giờ?"; then
             update_script_silent
         else
-            print_info "Bạn có thể cập nhật sau bằng lệnh: ozi system update"
+            print_info "Bạn có thể cập nhật sau bằng lệnh: ozi update"
             echo ""
         fi
     fi

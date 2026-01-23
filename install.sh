@@ -168,6 +168,25 @@ create_symlink() {
     print_success "Symlink: $BIN_LINK -> $INSTALL_DIR/ozi"
 }
 
+setup_git_hooks() {
+    print_info "Cài đặt Git hooks..."
+    
+    if [[ -d "$INSTALL_DIR/.git/hooks" ]]; then
+        # Create post-merge hook
+        cat > "$INSTALL_DIR/.git/hooks/post-merge" << 'HOOK_EOF'
+#!/bin/bash
+# Auto-set permissions after git pull/merge
+echo "🔧 Setting file permissions..."
+chmod +x /opt/oziscript/ozi 2>/dev/null || true
+find /opt/oziscript -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+echo "✓ Permissions updated"
+HOOK_EOF
+        
+        chmod +x "$INSTALL_DIR/.git/hooks/post-merge"
+        print_success "Git hooks đã được cài đặt (auto-fix permissions)"
+    fi
+}
+
 verify_installation() {
     print_info "Kiểm tra cài đặt..."
     
@@ -205,6 +224,7 @@ main() {
     install_files
     set_permissions
     create_symlink
+    setup_git_hooks
     verify_installation
     print_complete
 }
