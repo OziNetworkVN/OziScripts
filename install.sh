@@ -51,6 +51,10 @@ print_error() {
     echo -e "${RED}✗${NC} $1"
 }
 
+print_warning() {
+    echo -e "${YELLOW}⚠${NC} $1"
+}
+
 print_info() {
     echo -e "${BLUE}ℹ${NC} $1"
 }
