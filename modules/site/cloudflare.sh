@@ -47,8 +47,19 @@ configure_cloudflare_api() {
     
     local token=$(read_secret "Nhập API Token")
     
+    # Trim whitespace and newlines
+    token=$(echo "$token" | tr -d '[:space:]')
+    
     if [[ -z "$token" ]]; then
         print_error "Token không được để trống"
+        return 1
+    fi
+    
+    # Validate token format (basic check)
+    if [[ ! "$token" =~ ^[a-zA-Z0-9_-]+$ ]]; then
+        print_error "Token có ký tự không hợp lệ"
+        echo ""
+        echo -e "  ${YELLOW}Token chỉ được chứa: a-z, A-Z, 0-9, _, -${NC}"
         return 1
     fi
     
@@ -70,6 +81,13 @@ configure_cloudflare_api() {
     # Verify token
     print_info "Đang xác thực token..."
     
+    # Debug: Log token length (not the actual token for security)
+    mkdir -p /var/log/oziscript 2>/dev/null
+    echo "" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    echo "$(date): Token verification attempt" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    echo "Token length: ${#token}" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    echo "Token first 10 chars: ${token:0:10}..." >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    
     local response=$(curl -s -X GET "${CF_API_URL}/user/tokens/verify" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
@@ -79,9 +97,6 @@ configure_cloudflare_api() {
     local body=$(echo "$response" | sed '/HTTP_STATUS:/d')
     
     # Debug output
-    mkdir -p /var/log/oziscript 2>/dev/null
-    echo "" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
-    echo "$(date): Token verification" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
     echo "HTTP Code: $http_code" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
     echo "Response: $body" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
     
