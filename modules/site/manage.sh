@@ -303,6 +303,150 @@ view_site_logs() {
     tail -f "$log_file"
 }
 
+# Thêm domain alias (nhiều domain cùng source)
+add_domain_alias() {
+    local main_domain="$1"
+    local alias_domain="$2"
+    
+    if [[ -z "$main_domain" ]] || [[ -z "$alias_domain" ]]; then
+        print_error "Vui lòng nhập cả domain chính và domain alias"
+        return 1
+    fi
+    
+    # Kiểm tra domain chính có tồn tại không
+    if [[ ! -d "$WWW_DIR/$main_domain" ]]; then
+        print_error "Domain chính '$main_domain' không tồn tại"
+        return 1
+    fi
+    
+    # Kiểm tra alias đã tồn tại chưa
+    if [[ -f "$NGINX_SITES_AVAILABLE/$alias_domain" ]]; then
+        print_error "Domain alias '$alias_domain' đã tồn tại"
+        return 1
+    fi
+    
+    print_header "THÊM DOMAIN ALIAS"
+    print_info "Domain chính: $main_domain"
+    print_info "Domain alias: $alias_domain"
+    
+    local main_config="$NGINX_SITES_AVAILABLE/$main_domain"
+    local alias_config="$NGINX_SITES_AVAILABLE/$alias_domain"
+    
+    # Copy config từ domain chính và thay đổi server_name
+    cp "$main_config" "$alias_config"
+    
+    # Thay thế server_name trong config
+    sed -i "s/server_name $main_domain/server_name $alias_domain/" "$alias_config"
+    sed -i "s/server_name www\.$main_domain/server_name www.$alias_domain/" "$alias_config"
+    
+    # Cập nhật log paths
+    sed -i "s|/logs/access.log|/logs/${alias_domain}_access.log|" "$alias_config"
+    sed -i "s|/logs/error.log|/logs/${alias_domain}_error.log|" "$alias_config"
+    
+    # Enable site
+    ln -sf "$alias_config" "$NGINX_SITES_ENABLED/$alias_domain"
+    
+    # Test và reload nginx
+    if nginx -t 2>/dev/null; then
+        systemctl reload nginx
+        print_success "Đã thêm domain alias: $alias_domain → $main_domain"
+        echo ""
+        echo -e "  ${BOLD_CYAN}Main Domain:${NC}  $main_domain"
+        echo -e "  ${BOLD_CYAN}Alias Domain:${NC} $alias_domain"
+        echo -e "  ${BOLD_CYAN}Root Path:${NC}    $WWW_DIR/$main_domain"
+        echo ""
+        print_info "Hãy trỏ DNS của $alias_domain về IP server"
+        log_info "Added domain alias: $alias_domain -> $main_domain"
+    else
+        print_error "Nginx config có lỗi"
+        rm -f "$alias_config"
+        rm -f "$NGINX_SITES_ENABLED/$alias_domain"
+        return 1
+    fi
+}
+
+# Thêm domain alias (interactive)
+add_domain_alias_interactive() {
+    print_header "THÊM DOMAIN ALIAS"
+    
+    echo ""
+    list_sites
+    echo ""
+    
+    local main_domain=$(read_input "Nhập domain chính (đã tồn tại)")
+    if [[ -z "$main_domain" ]]; then
+        print_error "Domain chính không được để trống"
+        return 1
+    fi
+    
+    local alias_domain=$(read_input "Nhập domain alias (mới)")
+    if [[ -z "$alias_domain" ]]; then
+        print_error "Domain alias không được để trống"
+        return 1
+    fi
+    
+    add_domain_alias "$main_domain" "$alias_domain"
+}
+
+# List domain aliases
+list_domain_aliases() {
+    local main_domain="$1"
+    
+    if [[ -z "$main_domain" ]]; then
+        main_domain=$(read_input "Nhập domain chính")
+    fi
+    
+    if [[ ! -d "$WWW_DIR/$main_domain" ]]; then
+        print_error "Domain '$main_domain' không tồn tại"
+        return 1
+    fi
+    
+    print_header "DOMAIN ALIASES: $main_domain"
+    
+    local main_path="$WWW_DIR/$main_domain"
+    local found=0
+    
+    echo ""
+    echo -e "${BOLD_CYAN}Domain chính:${NC} $main_domain"
+    echo -e "${BOLD_CYAN}Root path:${NC}    $main_path"
+    echo ""
+    echo -e "${BOLD_WHITE}Các domain aliases:${NC}"
+    print_separator
+    
+    # Duyệt qua tất cả configs và tìm những config cùng root path
+    for config in "$NGINX_SITES_AVAILABLE"/*; do
+        if [[ -f "$config" ]]; then
+            local domain=$(basename "$config")
+            
+            # Bỏ qua domain chính
+            if [[ "$domain" == "$main_domain" ]]; then
+                continue
+            fi
+            
+            # Kiểm tra xem config có cùng root path không
+            if grep -q "root $main_path" "$config" 2>/dev/null; then
+                local status="disabled"
+                if [[ -L "$NGINX_SITES_ENABLED/$domain" ]]; then
+                    status="${GREEN}enabled${NC}"
+                else
+                    status="${YELLOW}disabled${NC}"
+                fi
+                
+                echo -e "  • ${BOLD_WHITE}$domain${NC} [$status]"
+                found=$((found + 1))
+            fi
+        fi
+    done
+    
+    echo ""
+    
+    if [[ $found -eq 0 ]]; then
+        print_info "Không có domain alias nào"
+    else
+        print_success "Tìm thấy $found domain alias(es)"
+    fi
+}
+
 #================================================================
 # MAIN
 #================================================================
@@ -325,6 +469,12 @@ if [[ "${BASH_SOURCE[0]}" == "$0" ]]; then
             ;;
         logs)
             view_site_logs "${2:-}" "${3:-error}"
+            ;;
+        add-alias)
+            add_domain_alias "${2:-}" "${3:-}"
+            ;;
+        list-aliases)
+            list_domain_aliases "${2:-}"
             ;;
         *)
             create_site_interactive

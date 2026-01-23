@@ -166,6 +166,8 @@ menu_website() {
     print_menu_item "3" "Xoá website"
     print_menu_item "4" "Enable/Disable website"
     print_menu_item "5" "Xem logs website"
+    print_menu_item "6" "Thêm domain alias (cùng source)"
+    print_menu_item "7" "Xem domain aliases"
     
     print_menu_back
 }
@@ -425,7 +427,7 @@ handle_website_menu() {
     while true; do
         menu_website
         echo ""
-        read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-5]: ${NC}")" choice
+        read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
         
         source "$OZI_DIR/modules/site/manage.sh"
 
@@ -448,6 +450,8 @@ handle_website_menu() {
                 wait_enter
                 ;;
             5) view_site_logs; wait_enter ;;
+            6) add_domain_alias_interactive; wait_enter ;;
+            7) list_domain_aliases; wait_enter ;;
             0) return ;;
             *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
