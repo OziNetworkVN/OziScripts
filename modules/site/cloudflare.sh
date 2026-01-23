@@ -114,73 +114,125 @@ create_origin_certificate() {
     
     print_info "Đang tạo Origin Certificate cho $domain..."
     
-    # Get Zone ID first
-    local root_domain=$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}')
-    print_info "Đang lấy Zone ID cho $root_domain..."
-    
-    local zone_response=$(curl -s -X GET "${CF_API_URL}/zones?name=${root_domain}" \
-        -H "Authorization: Bearer ${token}" \
-        -H "Content-Type: application/json")
-    
-    local zone_id=$(echo "$zone_response" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
-    
-    if [[ -z "$zone_id" ]]; then
-        print_error "Không tìm thấy Zone cho domain $root_domain"
-        print_warning "Domain phải được thêm vào Cloudflare trước"
-        return 1
-    fi
-    
-    print_info "Zone ID: $zone_id"
-    
     # Create SSL directory
     local ssl_dir="$SSL_DIR/$domain"
     mkdir -p "$ssl_dir"
     
-    # Request certificate from Cloudflare (15 years = 5475 days)
-    local payload=$(cat << EOF
+    # Ask for custom key/CSR or auto-generate
+    echo ""
+    echo "  ${BOLD_WHITE}Chọn phương thức:${NC}"
+    echo "  ${CYAN}[1]${NC} Tự động tạo (Cloudflare generate)"
+    echo "  ${CYAN}[2]${NC} Sử dụng Private Key và CSR có sẵn"
+    echo ""
+    
+    local method
+    read -p "$(echo -e "${BOLD_WHITE}Chọn phương thức [1-2]: ${NC}")" method
+    
+    local payload
+    local private_key=""
+    
+    if [[ "$method" == "2" ]]; then
+        # Custom key and CSR
+        echo ""
+        print_info "Nhập Private Key (paste toàn bộ, kết thúc bằng Ctrl+D):"
+        echo "  Bao gồm cả -----BEGIN PRIVATE KEY----- và -----END PRIVATE KEY-----"
+        echo ""
+        
+        private_key=$(cat)
+        
+        echo ""
+        print_info "Nhập Certificate Signing Request (CSR):"
+        echo "  Bao gồm cả -----BEGIN CERTIFICATE REQUEST----- và -----END CERTIFICATE REQUEST-----"
+        echo ""
+        
+        local csr=$(cat)
+        
+        # Validate inputs
+        if [[ ! "$private_key" =~ "BEGIN" ]] || [[ ! "$csr" =~ "BEGIN" ]]; then
+            print_error "Private Key hoặc CSR không hợp lệ"
+            return 1
+        fi
+        
+        # Save private key first
+        echo "$private_key" > "$ssl_dir/key.pem"
+        chmod 600 "$ssl_dir/key.pem"
+        
+        # Escape newlines for JSON
+        csr=$(echo "$csr" | sed ':a;N;$!ba;s/\n/\\n/g')
+        
+        payload=$(cat << EOF
 {
-    "hostnames": ["$domain", "*.$domain"],
+    "hostnames": ["$domain", "*.${domain}"],
     "requested_validity": 5475,
     "request_type": "origin-rsa",
-    "csr": ""
+    "csr": "$csr"
 }
 EOF
 )
+    else
+        # Auto-generate
+        payload=$(cat << EOF
+{
+    "hostnames": ["$domain", "*.${domain}"],
+    "requested_validity": 5475,
+    "request_type": "origin-rsa"
+}
+EOF
+)
+    fi
     
-    print_info "Đang yêu cầu certificate..."
+    print_info "Đang yêu cầu certificate từ Cloudflare..."
     
-    # Use zone-specific endpoint for origin certificates
-    local response=$(curl -s -X POST "${CF_API_URL}/zones/${zone_id}/origin_tls_client_auth/hostnames/certificates" \
+    # Use correct Origin CA Certificates endpoint (no zone_id needed)
+    local response=$(curl -s -X POST "${CF_API_URL}/certificates" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
         -d "$payload")
     
+    # Debug: Log response
+    echo "$(date): Certificate request for $domain" >> /var/log/oziscript/cloudflare_ssl.log
+    echo "Response: $response" >> /var/log/oziscript/cloudflare_ssl.log
+    
     # Check if success
     if echo "$response" | grep -q '"success":true'; then
-        # Extract certificate and key
+        # Extract certificate
         local cert=$(echo "$response" | grep -o '"certificate":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
-        local key=$(echo "$response" | grep -o '"private_key":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
         
-        if [[ -z "$cert" ]] || [[ -z "$key" ]]; then
-            print_error "Không thể trích xuất certificate hoặc key"
-            echo "Response: $response" >> /var/log/oziscript/cloudflare_ssl.log
+        # If auto-generate, also extract private key
+        if [[ "$method" != "2" ]]; then
+            private_key=$(echo "$response" | grep -o '"private_key":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
+            
+            if [[ -z "$private_key" ]]; then
+                print_error "Không thể trích xuất private key từ response"
+                return 1
+            fi
+            
+            # Save private key
+            echo -e "$private_key" > "$ssl_dir/key.pem"
+            chmod 600 "$ssl_dir/key.pem"
+        fi
+        
+        if [[ -z "$cert" ]]; then
+            print_error "Không thể trích xuất certificate"
             return 1
         fi
         
-        # Save files
+        # Save certificate
         echo -e "$cert" > "$ssl_dir/cert.pem"
-        echo -e "$key" > "$ssl_dir/key.pem"
-        
-        # Set permissions
-        chmod 600 "$ssl_dir/key.pem"
         chmod 644 "$ssl_dir/cert.pem"
         
-        print_success "Certificate đã được tạo!"
+        # Get certificate ID and expiry
+        local cert_id=$(echo "$response" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+        local expires_on=$(echo "$response" | grep -o '"expires_on":"[^"]*"' | head -1 | cut -d'"' -f4)
+        
+        print_success "Certificate đã được tạo thành công!"
         echo ""
         echo -e "  ${BOLD_CYAN}Certificate:${NC} $ssl_dir/cert.pem"
         echo -e "  ${BOLD_CYAN}Private Key:${NC} $ssl_dir/key.pem"
         echo -e "  ${BOLD_CYAN}Hiệu lực:${NC}    15 năm"
-        echo -e "  ${BOLD_CYAN}Hostnames:${NC}   $domain, *.$domain"
+        echo -e "  ${BOLD_CYAN}Hostnames:${NC}   $domain, *.${domain}"
+        [[ -n "$cert_id" ]] && echo -e "  ${BOLD_CYAN}Cert ID:${NC}     $cert_id"
+        [[ -n "$expires_on" ]] && echo -e "  ${BOLD_CYAN}Hết hạn:${NC}     $expires_on"
         echo ""
         
         log_info "Created Cloudflare Origin Certificate for: $domain"
@@ -188,24 +240,32 @@ EOF
     else
         print_error "Không thể tạo certificate"
         echo ""
+        
+        # Parse error details
         local error_msg=$(echo "$response" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
         local error_code=$(echo "$response" | grep -o '"code":[0-9]*' | head -1 | cut -d':' -f2)
         
         if [[ -n "$error_msg" ]]; then
-            echo "  ${RED}Lỗi:${NC} $error_msg ${RED}(Code: $error_code)${NC}"
+            echo "  ${RED}Lỗi:${NC} $error_msg"
+            [[ -n "$error_code" ]] && echo "  ${RED}Code:${NC} $error_code"
+        else
+            echo "  ${RED}Response:${NC} $response"
         fi
         
-        # Common error messages
-        if echo "$response" | grep -q "authentication"; then
-            print_warning "Token không có quyền tạo Origin Certificate"
-            print_info "Kiểm tra lại quyền: Zone → SSL and Certificates → Edit"
-        elif echo "$response" | grep -q "zone"; then
-            print_warning "Không tìm thấy zone hoặc không có quyền truy cập"
-        fi
+        echo ""
         
-        # Log full response for debugging
-        echo "$(date): Failed to create certificate for $domain" >> /var/log/oziscript/cloudflare_ssl.log
-        echo "$response" >> /var/log/oziscript/cloudflare_ssl.log
+        # Common error troubleshooting
+        if echo "$response" | grep -qi "authentication\|token"; then
+            print_warning "Lỗi xác thực token"
+            echo ""
+            echo "  Kiểm tra:"
+            echo "  • Token có đúng không?"
+            echo "  • Token có quyền: SSL and Certificates → Edit?"
+            echo "  • Token đã active chưa?"
+        elif echo "$response" | grep -qi "invalid\|csr"; then
+            print_warning "CSR không hợp lệ"
+            echo "  Đảm bảo CSR đúng định dạng PEM"
+        fi
         
         return 1
     fi
