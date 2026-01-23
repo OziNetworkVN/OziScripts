@@ -32,13 +32,18 @@
 # SSH vào VPS
 ssh root@your-vps-ip
 
-# Clone và cài đặt
+# Cài Git (nếu VPS chưa có)
+apt-get update && apt-get install -y git
+
+# Clone repository
 cd /opt
 git clone https://github.com/OziNetworkVN/OziScripts.git oziscript
+
+# Chạy installer
 cd oziscript
 bash install.sh
 
-# Chạy ngay
+# Sử dụng ngay
 ozi
 ```
 
