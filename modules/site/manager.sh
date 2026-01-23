@@ -242,13 +242,42 @@ cmd_ssl() {
 ssl_install_wizard() {
     local domain="${1:-}"
     
+    # Always require domain
     if [[ -z "$domain" ]]; then
-        read -p "$(echo -e "${BOLD_WHITE}Tên miền: ${NC}")" domain
+        print_error "Vui lòng cung cấp tên miền"
+        echo "Sử dụng: ozi site ssl install <domain>"
+        echo
+        print_info "Danh sách sites hiện có:"
+        list_all_sites | while read -r site; do
+            echo "  - $site"
+        done
+        return 1
     fi
     
+    # Check if site exists
     if ! site_exists "$domain"; then
         print_error "Website không tồn tại: $domain"
+        echo
+        print_info "Tạo website trước khi cài SSL:"
+        echo "  ozi site create"
+        echo
+        print_info "Hoặc xem danh sách sites:"
+        echo "  ozi site list"
         return 1
+    fi
+    
+    # Check if SSL already installed
+    local ssl_enabled=$(get_site "$domain" | jq -r '.ssl.enabled')
+    if [[ "$ssl_enabled" == "true" ]]; then
+        print_warning "SSL đã được cài đặt cho $domain"
+        echo
+        if confirm "Bạn có muốn thay thế SSL hiện tại?"; then
+            print_info "Xóa SSL cũ..."
+            remove_ssl "$domain"
+        else
+            print_info "Đã hủy"
+            return 0
+        fi
     fi
     
     print_header "Cài Đặt SSL: $domain"
@@ -506,41 +535,159 @@ cmd_delete() {
     
     print_info "Đang xóa $domain..."
     
-    # Get site info
-    local root=$(get_site "$domain" | jq -r '.root')
-    local db_name=$(get_site "$domain" | jq -r '.database.name')
-    local db_type=$(get_site "$domain" | jq -r '.database.type')
+    # Get site info before deletion
+    local site_data=$(get_site "$domain")
+    local root=$(echo "$site_data" | jq -r '.root')
+    local db_name=$(echo "$site_data" | jq -r '.database.name')
+    local db_user=$(echo "$site_data" | jq -r '.database.user')
+    local db_type=$(echo "$site_data" | jq -r '.database.type')
+    local site_type=$(echo "$site_data" | jq -r '.type')
     
-    # Remove SSL
-    local ssl_enabled=$(get_site "$domain" | jq -r '.ssl.enabled')
+    # 1. Stop running processes
+    print_info "Đang dừng processes..."
+    
+    # Stop PM2 if Node.js site
+    if [[ "$site_type" == "nodejs" ]]; then
+        if command -v pm2 >/dev/null 2>&1; then
+            pm2 delete "$domain" 2>/dev/null || true
+            pm2 save 2>/dev/null || true
+        fi
+    fi
+    
+    # Stop Supervisor processes if Laravel
+    if [[ "$site_type" == "laravel" ]]; then
+        if command -v supervisorctl >/dev/null 2>&1; then
+            supervisorctl stop "${domain}:*" 2>/dev/null || true
+            rm -f "/etc/supervisor/conf.d/${domain}-*.conf" 2>/dev/null || true
+            supervisorctl reread 2>/dev/null || true
+            supervisorctl update 2>/dev/null || true
+        fi
+    fi
+    
+    # 2. Remove SSL certificates
+    local ssl_enabled=$(echo "$site_data" | jq -r '.ssl.enabled')
     if [[ "$ssl_enabled" == "true" ]]; then
-        print_info "Xóa SSL..."
+        print_info "Xóa SSL certificates..."
         remove_ssl "$domain" 2>/dev/null || true
     fi
     
-    # Remove Nginx config
+    # 3. Remove Nginx configuration
     print_info "Xóa Nginx config..."
     delete_site_config "$domain"
     
-    # Remove website directory
+    # Remove Nginx logs
+    rm -f "/var/log/nginx/${domain}_access.log" 2>/dev/null || true
+    rm -f "/var/log/nginx/${domain}_error.log" 2>/dev/null || true
+    
+    # 4. Remove website directory
     if [[ -d "$root" ]]; then
-        print_info "Xóa thư mục website..."
+        print_info "Xóa thư mục website: $root"
         rm -rf "$root"
     fi
     
-    # Remove database
+    # 5. Remove database and user
     if [[ "$db_type" == "mysql" && -n "$db_name" ]]; then
-        print_info "Xóa database..."
+        print_info "Xóa database và user..."
+        
+        # Drop database
         mysql -e "DROP DATABASE IF EXISTS \`$db_name\`;" 2>/dev/null || true
+        
+        # Drop user
+        if [[ -n "$db_user" ]]; then
+            mysql -e "DROP USER IF EXISTS '$db_user'@'localhost';" 2>/dev/null || true
+            mysql -e "FLUSH PRIVILEGES;" 2>/dev/null || true
+        fi
     fi
     
-    # Remove from site database
+    # 6. Remove database credentials file
+    rm -f "/root/.oziscript/db-credentials/${domain}.txt" 2>/dev/null || true
+    
+    # 7. Remove from site database
     delete_site_entry "$domain"
     
-    # Reload Nginx
-    reload_nginx 2>/dev/null || true
+    # 8. Reload Nginx
+    if test_nginx_config >/dev/null 2>&1; then
+        reload_nginx 2>/dev/null || true
+    fi
     
-    print_success "✓ Đã xóa $domain thành công"
+    print_separator
+    print_success "✓ Đã xóa $domain hoàn toàn"
+    echo
+    print_info "Đã cleanup:"
+    echo "  ✓ Nginx config và logs"
+    echo "  ✓ SSL certificates"
+    echo "  ✓ Website files ($root)"
+    [[ "$db_type" == "mysql" ]] && echo "  ✓ Database: $db_name"
+    [[ "$db_type" == "mysql" && -n "$db_user" ]] && echo "  ✓ Database user: $db_user"
+    [[ "$site_type" == "nodejs" ]] && echo "  ✓ PM2 processes"
+    [[ "$site_type" == "laravel" ]] && echo "  ✓ Supervisor configs"
+    echo "  ✓ Site database entry"
+}
+
+#================================================================
+# CLEANUP ALL
+#================================================================
+
+cmd_cleanup() {
+    require_root
+    
+    print_header "Dọn Dẹp Toàn Bộ Sites"
+    
+    print_warning "⚠ CẢNH BÁO: Hành động này sẽ:"
+    echo "  - Xóa TẤT CẢ websites trong site database"
+    echo "  - Xóa TẤT CẢ Nginx configs"
+    echo "  - Xóa TẤT CẢ SSL certificates"
+    echo "  - Xóa TẤT CẢ databases"
+    echo "  - Xóa TẤT CẢ website files"
+    echo
+    print_error "Hành động này KHÔNG THỂ HOÀN TÁC!"
+    echo
+    
+    if ! confirm "Bạn có CHẮC CHẮN muốn xóa tất cả?"; then
+        print_info "Đã hủy"
+        return 0
+    fi
+    
+    # Double confirmation
+    echo
+    print_warning "Xác nhận lần cuối:"
+    read -p "$(echo -e "${BOLD_RED}Gõ 'DELETE ALL' để xác nhận: ${NC}")" confirm_text
+    
+    if [[ "$confirm_text" != "DELETE ALL" ]]; then
+        print_info "Đã hủy"
+        return 0
+    fi
+    
+    print_info "Đang dọn dẹp toàn bộ..."
+    
+    local sites=$(list_all_sites)
+    local count=0
+    
+    if [[ -n "$sites" ]]; then
+        while read -r domain; do
+            print_info "Xóa: $domain"
+            cmd_delete "$domain" <<< "y" 2>/dev/null || true
+            ((count++))
+        done <<< "$sites"
+    fi
+    
+    # Force cleanup orphan configs
+    print_info "Xóa Nginx configs còn sót..."
+    rm -f /etc/nginx/sites-available/*.conf 2>/dev/null || true
+    rm -f /etc/nginx/sites-enabled/*.conf 2>/dev/null || true
+    
+    # Force cleanup site database
+    print_info "Reset site database..."
+    echo '{"sites":{},"version":"2.0.0"}' > /etc/oziscript/sites.db
+    
+    # Reload Nginx
+    systemctl reload nginx 2>/dev/null || true
+    
+    print_separator
+    print_success "✓ Đã dọn dẹp hoàn tất"
+    echo "  - Xóa $count websites"
+    echo "  - Reset site database"
+    echo "  - Xóa tất cả Nginx configs"
 }
 
 #================================================================
@@ -557,10 +704,27 @@ Commands:
     create              Tạo website mới
     list                Liệt kê tất cả website
     info <domain>       Xem thông tin chi tiết
-    delete <domain>     Xóa website
+    delete <domain>     Xóa website (cleanup hoàn toàn)
+    cleanup             Xóa TẤT CẢ sites (force cleanup)
     
     ssl                 Quản lý SSL certificates
+      install <domain>  Cài đặt SSL cho site
+      remove <domain>   Xóa SSL
+      renew <domain>    Gia hạn Let's Encrypt
+      status [domain]   Kiểm tra trạng thái
+      list              Liệt kê tất cả SSL
+      auto-renew        Tự động gia hạn SSL sắp hết hạn
+    
     alias               Quản lý domain aliases
+      add <domain> <alias>      Thêm alias
+      remove <domain> <alias>   Xóa alias
+      list <domain>             Liệt kê aliases
+
+Quy trình sử dụng:
+    1. Tạo site trước:    ozi site create
+    2. Cài SSL:           ozi site ssl install example.com
+    3. Thêm aliases:      ozi site alias add example.com www.example.com
+    4. Xem thông tin:     ozi site info example.com
 
 Examples:
     ozi site create
@@ -569,6 +733,7 @@ Examples:
     ozi site ssl install example.com
     ozi site alias add example.com www.example.com
     ozi site delete example.com
+    ozi site cleanup                    # NGUY HIỂM: Xóa tất cả!
 EOF
 }
 
@@ -599,11 +764,15 @@ function main() {
         delete)
             cmd_delete "$@"
             ;;
+        cleanup)
+            cmd_cleanup "$@"
+            ;;
         help|--help|-h)
             show_help
             ;;
         *)
             print_error "Unknown command: $cmd"
+            echo
             show_help
             return 1
             ;;
