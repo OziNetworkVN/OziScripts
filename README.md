@@ -1,23 +1,51 @@
 # Ozi Script
 
-Bộ công cụ quản lý VPS bằng CLI dành cho **Debian 12+**, với giao diện tiếng Việt.
+<div align="center">
+  
+[![Ozi Network](https://img.shields.io/badge/Ozi-Network-blue?style=for-the-badge&logo=data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMjQiIGhlaWdodD0iMjQiIHZpZXdCb3g9IjAgMCAyNCAyNCIgZmlsbD0ibm9uZSIgeG1sbnM9Imh0dHA6Ly93d3cudzMub3JnLzIwMDAvc3ZnIj4KPHBhdGggZD0iTTEyIDJMMiA3TDEyIDEyTDIyIDdMMTIgMloiIGZpbGw9IndoaXRlIi8+CjxwYXRoIGQ9Ik0yIDEyTDEyIDE3TDIyIDEyIiBzdHJva2U9IndoaXRlIiBzdHJva2Utd2lkdGg9IjIiLz4KPC9zdmc+)](https://ozinetwork.com)
+[![Debian](https://img.shields.io/badge/Debian-12%2B-A81D33?style=for-the-badge&logo=debian)](https://www.debian.org/)
+[![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)](LICENSE)
+[![GitHub](https://img.shields.io/badge/GitHub-OziScripts-181717?style=for-the-badge&logo=github)](https://github.com/OziNetworkVN/OziScripts)
 
-## ✨ Tính năng
+</div>
 
-- **Menu dạng số** - Giao diện tiếng Việt, dễ sử dụng như VPSSIM
-- **Multi-PHP** - Cài đặt đồng thời nhiều phiên bản PHP (7.4 - 8.4)
-- **Tối ưu RAM** - Tự động tính toán thông số PHP-FPM tối ưu theo cấu hình VPS
-- **Nginx Templates** - Cấu hình Website chuẩn cho Laravel, WordPress, Node.js, Static
-- **SSL Origin** - Tích hợp Cloudflare API, cấp SSL 15 năm miễn phí
-- **Database** - Hỗ trợ PostgreSQL, MySQL/MariaDB và công cụ quản trị Adminer
-- **Bảo mật** - Firewall UFW, chặn truy cập trái phép với Fail2ban, SSH hardening
-- **Backup & Restore** - Sao lưu toàn bộ dữ liệu hoặc database, hỗ trợ đặt lịch tự động
-- **Self-Update** - Cơ chế tự động cập nhật an toàn với rollback khi lỗi
+> 🚀 Bộ công cụ quản lý VPS chuyên nghiệp dành cho **Debian 12+** | Giao diện tiếng Việt | Miễn phí & Open Source
 
-## 🚀 Cài đặt
+## ✨ Tính năng nổi bật
+
+- 🎨 **Menu dạng số** - Giao diện tiếng Việt trực quan, dễ sử dụng như VPSSIM
+- 🐘 **Multi-PHP** - Cài đặt đồng thời nhiều phiên bản PHP (7.4, 8.0, 8.1, 8.2, 8.3, 8.4)
+- 🧠 **Tối ưu RAM tự động** - Tính toán thông số PHP-FPM tối ưu theo cấu hình VPS
+- 🌐 **Nginx Templates** - Cấu hình Website chuẩn cho Laravel, WordPress, Node.js, Static
+- 🔒 **SSL miễn phí** - Tích hợp Cloudflare API (SSL 15 năm) & Let's Encrypt
+- 🗄️ **Multi Database** - Hỗ trợ PostgreSQL, MySQL/MariaDB và Adminer web interface
+- 🛡️ **Bảo mật toàn diện** - UFW Firewall, Fail2ban, SSH hardening tự động
+- 💾 **Backup & Restore** - Sao lưu toàn bộ hoặc database, hỗ trợ cronjob tự động
+- 🔄 **Self-Update** - Cơ chế tự động cập nhật an toàn với rollback khi lỗi
+- 🚀 **Deploy Tools** - Git-based deployment cho Laravel, Node.js, WordPress
+
+## 🚀 Cài đặt nhanh
+
+### Phương pháp 1: Từ GitHub (Khuyến nghị)
 
 ```bash
-# Upload lên VPS
+# SSH vào VPS
+ssh root@your-vps-ip
+
+# Clone và cài đặt
+cd /opt
+git clone https://github.com/OziNetworkVN/OziScripts.git oziscript
+cd oziscript
+bash install.sh
+
+# Chạy ngay
+ozi
+```
+
+### Phương pháp 2: Upload thủ công
+
+```bash
+# Upload từ máy local
 scp -r . root@your-vps-ip:/opt/oziscript
 
 # SSH vào VPS
@@ -30,33 +58,84 @@ bash install.sh
 
 ## 📖 Sử dụng
 
+### Khởi động Menu
+
 ```bash
 # Mở menu chính
 ozi
 ```
 
-### Menu chính
+### Demo Interface
 
 ```
 ╔══════════════════════════════════════════════════════════════╗
-║                    OZI SCRIPT - MENU CHÍNH                    ║
-║                   VPS: 103.xxx.xxx.xxx (Debian 13)            ║
+║              OZI SCRIPT - Quản lý VPS                        ║
+║              VPS: 103.xxx.xxx.xxx (Debian 13)                ║
 ╚══════════════════════════════════════════════════════════════╝
 
-[1] Thông tin hệ thống
-[2] Quản lý PHP
-[3] Quản lý Nginx
-[4] Quản lý Database
-[5] Quản lý Website
-[6] SSL / Cloudflare
-[7] Bảo mật Server
-[8] Backup & Restore
-[9] Deploy ứng dụng
-[10] Cài đặt thêm
+  MENU CHÍNH
+────────────────────────────────────────────────────────────────
 
-[0] Thoát
+  [1] Thông tin hệ thống
+  [2] Quản lý PHP
+  [3] Quản lý Nginx
+  [4] Quản lý Database
+  [5] Quản lý Website
+  [6] SSL / Cloudflare
+  [7] Bảo mật Server
+  [8] Backup & Restore
+  [9] Deploy ứng dụng
+  [10] Cài đặt thêm
+
+  [0] Thoát
 
 Nhập lựa chọn [0-10]: _
+```
+
+## 📚 Hướng dẫn chi tiết
+
+### 🚀 Quick Start: Tạo website Laravel
+
+```bash
+# 1. Cài PHP 8.3
+ozi  # Chọn 2 → 1 → nhập "8.3"
+
+# 2. Cài Nginx
+# Chọn 3 → 1
+
+# 3. Cài Database
+# Chọn 4 → 1 (PostgreSQL) hoặc 2 (MySQL)
+
+# 4. Tạo website
+# Chọn 5 → 1
+# Type: laravel
+# Domain: myapp.com
+# PHP: 8.3
+
+# 5. Cài SSL Cloudflare (15 năm miễn phí)
+# Chọn 6 → 5 (Config API)
+# Sau đó chọn 1 (Install SSL)
+
+# 6. Deploy từ Git
+# Chọn 9 → 1
+# Domain: myapp.com
+# Git URL: https://github.com/user/laravel-app.git
+# Branch: main
+```
+
+### 🎯 Quick Start: WordPress Site
+
+```bash
+# 1. Cài PHP + MySQL
+ozi  # Chọn 2 → 1 → "8.2"
+# Chọn 4 → 2 (MySQL)
+
+# 2. Deploy WordPress
+# Chọn 9 → 3
+# Nhập domain và database info
+
+# 3. Cài SSL Let's Encrypt
+# Chọn 6 → 2
 ```
 
 ### Các tính năng nổi bật
@@ -106,11 +185,52 @@ Hệ thống template thông minh giúp tạo cấu hình Nginx chuẩn cho từ
 └── templates/          # Nginx templates
 ```
 
-## 🔧 Yêu cầu
+## 🔧 Yêu cầu hệ thống
 
-- Debian 12 (Bookworm) hoặc Debian 13 (Trixie)
-- Quyền root
+- ✅ **OS:** Debian 12 (Bookworm) hoặc Debian 13 (Trixie)
+- ✅ **Quyền:** Root access
+- ✅ **RAM:** Tối thiểu 512MB (khuyến nghị 1GB+)
+- ✅ **Disk:** Tối thiểu 10GB free space
+- ✅ **Network:** Kết nối internet ổn định
+
+## 🎯 Use Cases
+
+- 🏢 **Hosting Laravel Apps** - Deploy và quản lý Laravel projects với Octane support
+- 🌐 **WordPress Sites** - Tạo và tối ưu WordPress sites trong vài phút
+- ⚡ **Node.js Applications** - Reverse proxy và PM2 process management
+- 🗄️ **Database Management** - PostgreSQL, MySQL với Adminer web interface
+- 🔐 **Server Security** - UFW, Fail2ban, SSH hardening tự động
+- 💾 **Automated Backups** - Schedule daily/weekly backups với cronjobs
+
+## 🤝 Đóng góp
+
+Chúng tôi luôn chào đón mọi đóng góp! Xem [CONTRIBUTING.md](docs/CONTRIBUTING.md) để biết thêm chi tiết.
+
+## 📞 Hỗ trợ
+
+- 🌐 **Website:** [Ozi Network](https://ozinetwork.com)
+- 💬 **Issues:** [GitHub Issues](https://github.com/OziNetworkVN/OziScripts/issues)
+- 📧 **Email:** dev@oziscript.dev
+- 📚 **Documentation:** [docs/](docs/)
+
+## 👥 Credits
+
+Phát triển bởi [**Ozi Network**](https://ozinetwork.com) - Giải pháp VPS & Cloud Hosting chuyên nghiệp.
+
+## ⭐ Support Us
+
+Nếu bạn thấy project hữu ích, hãy cho chúng tôi một ⭐ trên [GitHub](https://github.com/OziNetworkVN/OziScripts)!
 
 ## 📄 License
 
-MIT License
+MIT License - Copyright © 2026 [Ozi Network](https://ozinetwork.com)
+
+---
+
+<div align="center">
+  
+**Made with ❤️ by [Ozi Network](https://ozinetwork.com)**
+
+[Website](https://ozinetwork.com) • [GitHub](https://github.com/OziNetworkVN) • [Documentation](docs/)
+
+</div>
