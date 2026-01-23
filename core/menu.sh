@@ -429,29 +429,87 @@ handle_website_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-7]: ${NC}")" choice
         
-        source "$OZI_DIR/modules/site/manage.sh"
+        # Load V2 Site Manager
+        source "$OZI_DIR/core/site-db.sh"
+        source "$OZI_DIR/modules/site/manager.sh"
 
         case "$choice" in
-            1) create_site_interactive; wait_enter ;;
-            2) list_sites; wait_enter ;;
+            1) cmd_create; wait_enter ;;
+            2) cmd_list; wait_enter ;;
             3)
+                echo ""
                 local domain=$(read_input "Nhập domain cần xoá")
-                delete_site "$domain"
-                wait_enter
-                ;;
-            4)
-                local action=$(read_input "Nhập 'enable' hoặc 'disable'" "enable")
-                local domain=$(read_input "Nhập domain")
-                if [[ "$action" == "disable" ]]; then
-                    disable_site "$domain"
-                else
-                    enable_site "$domain"
+                if [[ -n "$domain" ]]; then
+                    cmd_delete "$domain"
                 fi
                 wait_enter
                 ;;
-            5) view_site_logs; wait_enter ;;
-            6) add_domain_alias_interactive; wait_enter ;;
-            7) list_domain_aliases; wait_enter ;;
+            4)
+                echo ""
+                local domain=$(read_input "Nhập domain")
+                if [[ -z "$domain" ]]; then
+                    print_error "Domain không được để trống"
+                    wait_enter
+                    continue
+                fi
+                
+                if ! site_exists "$domain"; then
+                    print_error "Domain '$domain' không tồn tại"
+                    wait_enter
+                    continue
+                fi
+                
+                echo ""
+                print_info "1) Enable (kích hoạt)"
+                print_info "2) Disable (vô hiệu hoá)"
+                echo ""
+                local action_choice=$(read_input "Chọn hành động [1-2]" "1")
+                
+                # Load nginx module for enable/disable
+                source "$OZI_DIR/core/nginx.sh"
+                
+                case "$action_choice" in
+                    1) 
+                        enable_site "$domain"
+                        systemctl reload nginx
+                        print_success "Đã kích hoạt website: $domain"
+                        ;;
+                    2)
+                        disable_site "$domain"
+                        systemctl reload nginx  
+                        print_success "Đã vô hiệu hoá website: $domain"
+                        ;;
+                    *)
+                        print_error "Lựa chọn không hợp lệ"
+                        ;;
+                esac
+                wait_enter
+                ;;
+            5)
+                echo ""
+                local domain=$(read_input "Nhập domain")
+                if [[ -n "$domain" && -d "$WWW_DIR/$domain/logs" ]]; then
+                    print_header "LOGS: $domain"
+                    echo ""
+                    print_subheader "Access Log (20 dòng cuối):"
+                    tail -n 20 "$WWW_DIR/$domain/logs/access.log" 2>/dev/null || print_info "Chưa có access log"
+                    echo ""
+                    print_subheader "Error Log (20 dòng cuối):"
+                    tail -n 20 "$WWW_DIR/$domain/logs/error.log" 2>/dev/null || print_info "Chưa có error log"
+                else
+                    print_error "Domain không tồn tại hoặc không có logs"
+                fi
+                wait_enter
+                ;;
+            6) cmd_alias; wait_enter ;;
+            7)
+                echo ""
+                local domain=$(read_input "Nhập domain chính")
+                if [[ -n "$domain" ]]; then
+                    cmd_alias "$domain" "list"
+                fi
+                wait_enter
+                ;;
             0) return ;;
             *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
@@ -464,15 +522,86 @@ handle_ssl_menu() {
         echo ""
         read -p "$(echo -e "${BOLD_WHITE}Nhập lựa chọn [0-5]: ${NC}")" choice
         
-        source "$OZI_DIR/modules/site/cloudflare.sh"
-        source "$OZI_DIR/modules/site/letsencrypt.sh"
+        # Load V2 Site Manager
+        source "$OZI_DIR/core/site-db.sh"
+        source "$OZI_DIR/modules/site/manager.sh"
 
         case "$choice" in
-            1) install_cloudflare_ssl_interactive; wait_enter ;;
-            2) install_letsencrypt_ssl; wait_enter ;;
-            3) list_ssl_certs; wait_enter ;;
-            4) renew_ssl_certs; wait_enter ;;
-            5) configure_cloudflare_api; wait_enter ;;
+            1)
+                # Cloudflare SSL
+                echo ""
+                local domain=$(read_input "Nhập domain")
+                if [[ -n "$domain" ]]; then
+                    cmd_ssl "$domain" "install" "cloudflare"
+                fi
+                wait_enter
+                ;;
+            2)
+                # Let's Encrypt SSL
+                echo ""
+                local domain=$(read_input "Nhập domain")
+                if [[ -n "$domain" ]]; then
+                    cmd_ssl "$domain" "install" "letsencrypt"
+                fi
+                wait_enter
+                ;;
+            3)
+                # List SSL certificates
+                print_header "DANH SÁCH SSL"
+                echo ""
+                
+                local sites=$(site_list)
+                if [[ -z "$sites" ]]; then
+                    print_warning "Chưa có website nào"
+                else
+                    printf "%-30s %-15s %-20s\n" "Domain" "SSL Type" "Status"
+                    print_separator
+                    
+                    echo "$sites" | while IFS= read -r site_json; do
+                        local domain=$(echo "$site_json" | jq -r '.domain')
+                        local ssl_type=$(echo "$site_json" | jq -r '.ssl.type // "none"')
+                        local ssl_status=$(echo "$site_json" | jq -r '.ssl.enabled // false')
+                        
+                        local status_text="Inactive"
+                        [[ "$ssl_status" == "true" ]] && status_text="Active"
+                        
+                        printf "%-30s %-15s %-20s\n" "$domain" "$ssl_type" "$status_text"
+                    done
+                fi
+                wait_enter
+                ;;
+            4)
+                # Renew SSL (Let's Encrypt only)
+                print_header "GIA HẠN SSL"
+                echo ""
+                print_info "Chạy lệnh gia hạn certbot..."
+                
+                if is_installed "certbot"; then
+                    certbot renew
+                    systemctl reload nginx
+                    print_success "Đã gia hạn SSL thành công"
+                else
+                    print_error "Certbot chưa được cài đặt"
+                fi
+                wait_enter
+                ;;
+            5)
+                # Configure Cloudflare API
+                print_header "CẤU HÌNH CLOUDFLARE API"
+                echo ""
+                
+                local email=$(read_input "Cloudflare Email")
+                local api_key=$(read_input "Cloudflare API Key")
+                
+                if [[ -n "$email" && -n "$api_key" ]]; then
+                    config_set "cloudflare_email" "$email"
+                    config_set "cloudflare_api_key" "$api_key"
+                    print_success "Đã lưu cấu hình Cloudflare"
+                else
+                    print_error "Email và API Key không được để trống"
+                fi
+                wait_enter
+                ;;
             0) return ;;
             *) print_error "Lựa chọn không hợp lệ"; sleep 1 ;;
         esac
