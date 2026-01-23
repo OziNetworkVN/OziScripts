@@ -171,6 +171,52 @@ chmod +x ozi
 find . -name "*.sh" -exec chmod +x {} \;
 ```
 
+#### ⚠️ Xử lý lỗi "local changes"
+
+Nếu gặp lỗi: `error: Your local changes to the following files would be overwritten by merge`
+
+**Cách 1: Reset về code gốc (Khuyến nghị)**
+```bash
+cd /opt/oziscript
+
+# Reset tất cả thay đổi local
+git reset --hard HEAD
+
+# Pull code mới
+git pull origin main
+
+# Set quyền
+chmod +x ozi
+find . -name "*.sh" -exec chmod +x {} \;
+```
+
+**Cách 2: Stash changes (Nếu muốn giữ thay đổi)**
+```bash
+cd /opt/oziscript
+
+# Lưu thay đổi tạm thời
+git stash
+
+# Pull code mới
+git pull origin main
+
+# Apply lại thay đổi (nếu cần)
+git stash pop
+
+# Set quyền
+chmod +x ozi
+find . -name "*.sh" -exec chmod +x {} \;
+```
+
+**Cách 3: Force pull (Nhanh nhất)**
+```bash
+cd /opt/oziscript
+git fetch origin
+git reset --hard origin/main
+chmod +x ozi
+find . -name "*.sh" -exec chmod +x {} \;
+```
+
 ### 📦 Thêm Domain Alias
 
 **Nhiều domain cùng trỏ về 1 source code:**
