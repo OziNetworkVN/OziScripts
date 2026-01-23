@@ -81,6 +81,17 @@ Commands:
       delete <domain>       Xóa website
       ssl                   Quản lý SSL certificates
       alias                 Quản lý domain aliases
+    
+    php                     Quản lý PHP config
+      check [version]       Kiểm tra extensions & config
+      optimize [version]    Tối ưu cho production
+      extensions [version]  Cài extensions đầy đủ
+    
+    redis                   Quản lý Redis config
+      check                 Kiểm tra status & config
+      optimize              Tối ưu cho production
+      laravel <domain>      Cấu hình cho Laravel
+      benchmark             Test performance
 
 Examples:
     ozi site create
@@ -88,6 +99,11 @@ Examples:
     ozi site info example.com
     ozi site ssl install example.com
     ozi site alias add example.com www.example.com
+    
+    ozi php check
+    ozi php optimize 8.3
+    ozi redis optimize
+    ozi redis laravel example.com
 
 EOF
 }
@@ -113,6 +129,16 @@ main() {
         site)
             # V2 Unified Site Management
             source "$OZI_DIR/modules/site/manager.sh"
+            main "$@"
+            ;;
+        php)
+            # PHP Configuration & Optimization
+            source "$OZI_DIR/modules/stack/php-optimize.sh"
+            main "$@"
+            ;;
+        redis)
+            # Redis Configuration & Optimization
+            source "$OZI_DIR/modules/stack/redis-config.sh"
             main "$@"
             ;;
         help|-h|--help)
