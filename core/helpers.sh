@@ -212,6 +212,22 @@ ensure_www_data_user() {
     print_success "User www-data đã được tạo"
 }
 
+# Ensure jq is installed (required for JSON operations)
+ensure_jq_installed() {
+    if ! command -v jq >/dev/null 2>&1; then
+        print_info "Đang cài đặt jq (JSON processor)..."
+        apt-get update -qq 2>/dev/null
+        apt-get install -y jq >/dev/null 2>&1
+        
+        if command -v jq >/dev/null 2>&1; then
+            print_success "Đã cài đặt jq"
+        else
+            print_error "Không thể cài đặt jq"
+            return 1
+        fi
+    fi
+}
+
 #================================================================
 # SYSTEM INFO FUNCTIONS
 #================================================================

@@ -12,6 +12,9 @@ OZI_DIR="${OZI_DIR:-/opt/oziscript}"
 source "$OZI_DIR/core/helpers.sh" 2>/dev/null || true
 source "$OZI_DIR/core/colors.sh" 2>/dev/null || true
 
+# Ensure jq is installed (required for JSON operations)
+ensure_jq_installed
+
 #================================================================
 # CONFIGURATION
 #================================================================

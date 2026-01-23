@@ -87,7 +87,7 @@ install_dependencies() {
     print_info "Đang cài đặt các thành phần phụ thuộc..."
     
     apt-get update -qq
-    apt-get install -y -qq curl git gnupg2 ca-certificates lsb-release tar gzip
+    apt-get install -y -qq curl git gnupg2 ca-certificates lsb-release tar gzip jq
     
     print_success "Các thành phần phụ thuộc đã được cài đặt"
 }
