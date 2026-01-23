@@ -91,6 +91,19 @@ install_dependencies() {
 install_files() {
     print_info "Đang cài đặt Ozi Script..."
     
+    # Kiểm tra nếu đang chạy từ thư mục cài đặt đích
+    if [[ "$SCRIPT_DIR" == "$INSTALL_DIR" ]]; then
+        print_warning "Script đang chạy từ thư mục cài đặt."
+        print_info "Tiến hành cài đặt tại chỗ..."
+        
+        # Tạo các thư mục cần thiết
+        mkdir -p "$CONFIG_DIR"
+        mkdir -p "$LOG_DIR"
+        
+        print_success "Cài đặt tại chỗ hoàn tất"
+        return 0
+    fi
+    
     # Xoá cài đặt cũ nếu có
     if [[ -d "$INSTALL_DIR" ]]; then
         print_info "Xoá phiên bản cũ..."
