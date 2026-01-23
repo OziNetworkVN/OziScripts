@@ -2,13 +2,13 @@
 #================================================================
 # Ozi Script - Config Module
 # Mô tả: Quản lý cấu hình
-# Phiên bản: 1.0.4
+# Phiên bản: 2.0.0
 #================================================================
 
 #================================================================
 # CONFIGURATION PATHS
 #================================================================
-OZI_VERSION="1.0.4"
+OZI_VERSION="2.0.0"
 OZI_DIR="${OZI_DIR:-/opt/oziscript}"
 OZI_CONFIG_DIR="${OZI_CONFIG_DIR:-/etc/oziscript}"
 OZI_LOG_DIR="${OZI_LOG_DIR:-/var/log/oziscript}"

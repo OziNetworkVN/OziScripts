@@ -4,7 +4,7 @@
 # Mô tả: CLI chính để quản lý VPS
 # Sử dụng: ozi [command]
 # Tác giả: Ozi DevOps
-# Phiên bản: 1.0.4
+# Phiên bản: 2.0.0
 #================================================================
 
 set -euo pipefail
@@ -13,7 +13,7 @@ set -euo pipefail
 # CONFIGURATION
 #================================================================
 OZI_DIR="${OZI_DIR:-/opt/oziscript}"
-OZI_VERSION="1.0.4"
+OZI_VERSION="2.0.0"
 
 #================================================================
 # LOAD CORE MODULES
@@ -65,17 +65,29 @@ show_help() {
 Ozi Script - Quản lý VPS cho Debian
 
 Sử dụng:
-    ozi              Mở menu chính (giao diện số)
-    ozi [lệnh]       Chạy lệnh trực tiếp
+    ozi                     Mở menu chính (giao diện số)
+    ozi [command]           Chạy lệnh trực tiếp
 
-Các lệnh:
-    (menu)           Mở menu chính
-    version          Xem phiên bản
-    update           Kiểm tra và cập nhật phiên bản mới
-    help             Xem hướng dẫn này
+Commands:
+    menu                    Mở menu chính
+    version                 Xem phiên bản
+    update                  Kiểm tra và cập nhật
+    help                    Xem hướng dẫn này
     
-Gợi ý:
-    Gõ 'ozi' để vào menu với giao diện dễ sử dụng!
+    site                    Quản lý website (V2)
+      create                Tạo website mới
+      list                  Liệt kê tất cả website
+      info <domain>         Xem thông tin chi tiết
+      delete <domain>       Xóa website
+      ssl                   Quản lý SSL certificates
+      alias                 Quản lý domain aliases
+
+Examples:
+    ozi site create
+    ozi site list
+    ozi site info example.com
+    ozi site ssl install example.com
+    ozi site alias add example.com www.example.com
 
 EOF
 }
@@ -97,6 +109,11 @@ main() {
         update)
             source "$OZI_DIR/modules/system/update.sh"
             update_script
+            ;;
+        site)
+            # V2 Unified Site Management
+            source "$OZI_DIR/modules/site/manager.sh"
+            main "$@"
             ;;
         help|-h|--help)
             show_help

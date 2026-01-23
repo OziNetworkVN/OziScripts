@@ -3,7 +3,7 @@
 # Ozi Script - Installer
 # Mô tả: Script cài đặt Ozi Script vào hệ thống
 # Sử dụng: sudo bash install.sh
-# Phiên bản: 1.0.4
+# Phiên bản: 2.0.0
 #================================================================
 
 set -euo pipefail
