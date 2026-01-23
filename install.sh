@@ -104,6 +104,10 @@ install_files() {
         mkdir -p "$CONFIG_DIR"
         mkdir -p "$LOG_DIR"
         
+        # Set permissions for in-place installation
+        chmod +x "$INSTALL_DIR/ozi"
+        find "$INSTALL_DIR" -name "*.sh" -exec chmod +x {} \;
+        
         print_success "Cài đặt tại chỗ hoàn tất"
         return 0
     fi

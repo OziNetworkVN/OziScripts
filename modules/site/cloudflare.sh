@@ -189,7 +189,6 @@ create_origin_certificate() {
 }
 EOF
 )
-    fi
     
     print_info "Đang yêu cầu certificate từ Cloudflare..."
     
