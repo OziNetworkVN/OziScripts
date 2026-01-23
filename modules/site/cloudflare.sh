@@ -19,15 +19,30 @@ CF_API_URL="https://api.cloudflare.com/client/v4"
 configure_cloudflare_api() {
     print_header "CẤU HÌNH CLOUDFLARE API"
     
-    echo "  Để tạo SSL 15 năm, bạn cần Cloudflare API Token."
     echo ""
-    echo "  Hướng dẫn lấy token:"
-    echo "  1. Đăng nhập https://dash.cloudflare.com/"
-    echo "  2. Click avatar → My Profile → API Tokens"
-    echo "  3. Create Token → Create Custom Token"
-    echo "  4. Quyền cần thiết:"
-    echo "     - SSL and Certificates → Origin Certificates → Edit"
-    echo "     - Zone → Zone → Read"
+    echo "  ${BOLD_WHITE}Để tạo SSL 15 năm, bạn cần Cloudflare API Token với đầy đủ quyền.${NC}"
+    echo ""
+    echo "  ${BOLD_CYAN}Hướng dẫn lấy token:${NC}"
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  1. Truy cập: ${CYAN}https://dash.cloudflare.com/${NC}"
+    echo "  2. Click avatar → ${BOLD_WHITE}My Profile${NC} → ${BOLD_WHITE}API Tokens${NC}"
+    echo "  3. ${BOLD_WHITE}Create Token${NC} → ${BOLD_WHITE}Create Custom Token${NC}"
+    echo ""
+    echo "  ${BOLD_YELLOW}Permissions (Quyền cần thiết):${NC}"
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  • Zone - ${CYAN}Zone${NC} - ${GREEN}Read${NC}"
+    echo "  • Zone - ${CYAN}Zone${NC} - ${GREEN}Edit${NC}"
+    echo "  • Zone - ${CYAN}Zone Settings${NC} - ${GREEN}Edit${NC}"
+    echo "  • Zone - ${CYAN}SSL and Certificates${NC} - ${GREEN}Edit${NC}"
+    echo "  • Zone - ${CYAN}SSL and Certificates${NC} - ${GREEN}Read${NC}"
+    echo "  • Zone - ${CYAN}DNS${NC} - ${GREEN}Edit${NC}"
+    echo "  • Zone - ${CYAN}Cache Purge${NC} - ${GREEN}Purge${NC}"
+    echo ""
+    echo "  ${BOLD_YELLOW}Zone Resources:${NC}"
+    echo "  ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+    echo "  • Include: ${GREEN}All zones${NC}"
+    echo ""
+    echo "  ${YELLOW}⚠${NC}  ${BOLD_WHITE}LƯU Ý:${NC} Token phải có đầy đủ các quyền trên!"
     echo ""
     
     local token=$(read_secret "Nhập API Token")
@@ -45,11 +60,29 @@ configure_cloudflare_api() {
         -H "Content-Type: application/json")
     
     if echo "$response" | grep -q '"success":true'; then
-        save_cloudflare_token "$token"
-        print_success "Token đã được lưu thành công!"
+        # Check permissions
+        local status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+        
+        if [[ "$status" == "active" ]]; then
+            save_cloudflare_token "$token"
+            print_success "Token hợp lệ và đã được lưu!"
+            echo ""
+            print_info "Token đã được lưu tại: /etc/oziscript/"
+            log_info "Configured Cloudflare API Token"
+            return 0
+        else
+            print_error "Token không active hoặc thiếu quyền"
+            return 1
+        fi
     else
-        print_error "Token không hợp lệ"
-        echo "$response" | grep -o '"message":"[^"]*"' | head -1
+        print_error "Token không hợp lệ hoặc thiếu quyền cần thiết"
+        echo ""
+        local error_msg=$(echo "$response" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+        if [[ -n "$error_msg" ]]; then
+            echo "  ${RED}Lỗi:${NC} $error_msg"
+        fi
+        echo ""
+        print_warning "Vui lòng kiểm tra lại token và đảm bảo đầy đủ quyền!"
         return 1
     fi
 }
@@ -74,9 +107,32 @@ create_origin_certificate() {
     local domain="$1"
     local token="$2"
     
+    if [[ -z "$domain" ]] || [[ -z "$token" ]]; then
+        print_error "Thiếu domain hoặc token"
+        return 1
+    fi
+    
     print_info "Đang tạo Origin Certificate cho $domain..."
     
-    # Create CSR and private key
+    # Get Zone ID first
+    local root_domain=$(echo "$domain" | awk -F. '{print $(NF-1)"."$NF}')
+    print_info "Đang lấy Zone ID cho $root_domain..."
+    
+    local zone_response=$(curl -s -X GET "${CF_API_URL}/zones?name=${root_domain}" \
+        -H "Authorization: Bearer ${token}" \
+        -H "Content-Type: application/json")
+    
+    local zone_id=$(echo "$zone_response" | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)
+    
+    if [[ -z "$zone_id" ]]; then
+        print_error "Không tìm thấy Zone cho domain $root_domain"
+        print_warning "Domain phải được thêm vào Cloudflare trước"
+        return 1
+    fi
+    
+    print_info "Zone ID: $zone_id"
+    
+    # Create SSL directory
     local ssl_dir="$SSL_DIR/$domain"
     mkdir -p "$ssl_dir"
     
@@ -91,15 +147,25 @@ create_origin_certificate() {
 EOF
 )
     
-    local response=$(curl -s -X POST "${CF_API_URL}/certificates" \
+    print_info "Đang yêu cầu certificate..."
+    
+    # Use zone-specific endpoint for origin certificates
+    local response=$(curl -s -X POST "${CF_API_URL}/zones/${zone_id}/origin_tls_client_auth/hostnames/certificates" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json" \
         -d "$payload")
     
+    # Check if success
     if echo "$response" | grep -q '"success":true'; then
         # Extract certificate and key
         local cert=$(echo "$response" | grep -o '"certificate":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
         local key=$(echo "$response" | grep -o '"private_key":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
+        
+        if [[ -z "$cert" ]] || [[ -z "$key" ]]; then
+            print_error "Không thể trích xuất certificate hoặc key"
+            echo "Response: $response" >> /var/log/oziscript/cloudflare_ssl.log
+            return 1
+        fi
         
         # Save files
         echo -e "$cert" > "$ssl_dir/cert.pem"
@@ -113,13 +179,34 @@ EOF
         echo ""
         echo -e "  ${BOLD_CYAN}Certificate:${NC} $ssl_dir/cert.pem"
         echo -e "  ${BOLD_CYAN}Private Key:${NC} $ssl_dir/key.pem"
-        echo -e "  ${BOLD_CYAN}Hết hạn:${NC} 15 năm"
+        echo -e "  ${BOLD_CYAN}Hiệu lực:${NC}    15 năm"
+        echo -e "  ${BOLD_CYAN}Hostnames:${NC}   $domain, *.$domain"
         echo ""
         
+        log_info "Created Cloudflare Origin Certificate for: $domain"
         return 0
     else
         print_error "Không thể tạo certificate"
-        echo "$response" | grep -o '"message":"[^"]*"' | head -1
+        echo ""
+        local error_msg=$(echo "$response" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+        local error_code=$(echo "$response" | grep -o '"code":[0-9]*' | head -1 | cut -d':' -f2)
+        
+        if [[ -n "$error_msg" ]]; then
+            echo "  ${RED}Lỗi:${NC} $error_msg ${RED}(Code: $error_code)${NC}"
+        fi
+        
+        # Common error messages
+        if echo "$response" | grep -q "authentication"; then
+            print_warning "Token không có quyền tạo Origin Certificate"
+            print_info "Kiểm tra lại quyền: Zone → SSL and Certificates → Edit"
+        elif echo "$response" | grep -q "zone"; then
+            print_warning "Không tìm thấy zone hoặc không có quyền truy cập"
+        fi
+        
+        # Log full response for debugging
+        echo "$(date): Failed to create certificate for $domain" >> /var/log/oziscript/cloudflare_ssl.log
+        echo "$response" >> /var/log/oziscript/cloudflare_ssl.log
+        
         return 1
     fi
 }
