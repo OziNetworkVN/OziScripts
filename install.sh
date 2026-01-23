@@ -3,7 +3,7 @@
 # Ozi Script - Installer
 # Mô tả: Script cài đặt Ozi Script vào hệ thống
 # Sử dụng: sudo bash install.sh
-# Phiên bản: 1.0.3
+# Phiên bản: 1.0.4
 #================================================================
 
 set -euo pipefail
@@ -177,13 +177,21 @@ setup_git_hooks() {
 #!/bin/bash
 # Auto-set permissions after git pull/merge
 echo "🔧 Setting file permissions..."
-chmod +x /opt/oziscript/ozi 2>/dev/null || true
-find /opt/oziscript -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
+chmod +x /opt/oziscript/ozi 2>/dev/null || chmod +x ozi 2>/dev/null || true
+find /opt/oziscript -name "*.sh" -exec chmod +x {} \; 2>/dev/null || find . -name "*.sh" -exec chmod +x {} \; 2>/dev/null || true
 echo "✓ Permissions updated"
 HOOK_EOF
         
         chmod +x "$INSTALL_DIR/.git/hooks/post-merge"
-        print_success "Git hooks đã được cài đặt (auto-fix permissions)"
+        
+        # Test hook
+        if [[ -x "$INSTALL_DIR/.git/hooks/post-merge" ]]; then
+            print_success "Git hooks đã được cài đặt (auto-fix permissions sau git pull)"
+        else
+            print_warning "Git hook cài đặt nhưng chưa executable"
+        fi
+    else
+        print_warning "Không tìm thấy .git/hooks (không phải Git repo)"
     fi
 }
 

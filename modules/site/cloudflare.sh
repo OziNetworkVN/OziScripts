@@ -55,13 +55,33 @@ configure_cloudflare_api() {
     # Verify token
     print_info "Đang xác thực token..."
     
-    local response=$(curl -s -X GET "${CF_API_URL}/user/tokens/verify" \
+    local response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X GET "${CF_API_URL}/user/tokens/verify" \
         -H "Authorization: Bearer ${token}" \
         -H "Content-Type: application/json")
     
-    if echo "$response" | grep -q '"success":true'; then
-        # Check permissions
-        local status=$(echo "$response" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
+    local http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
+    local body=$(echo "$response" | sed '/HTTP_CODE:/d')
+    
+    # Debug output
+    echo "" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
+    echo "$(date): Token verification" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
+    echo "HTTP Code: $http_code" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
+    echo "Response: $body" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
+    
+    if [[ "$http_code" != "200" ]]; then
+        print_error "Kết nối API thất bại (HTTP $http_code)"
+        echo ""
+        echo -e "  ${RED}Vui lòng kiểm tra:${NC}"
+        echo -e "  1. Kết nối internet"
+        echo -e "  2. Token đúng định dạng (không có khoảng trắng)"
+        echo -e "  3. Token chưa bị xóa trên Cloudflare"
+        echo ""
+        echo -e "  ${YELLOW}Log:${NC} /var/log/oziscript/cloudflare_api.log"
+        return 1
+    fi
+    
+    if echo "$body" | grep -q '"success":true'; then
+        local status=$(echo "$body" | grep -o '"status":"[^"]*"' | cut -d'"' -f4)
         
         if [[ "$status" == "active" ]]; then
             save_cloudflare_token "$token"
@@ -75,23 +95,27 @@ configure_cloudflare_api() {
         else
             print_error "Token không active: $status"
             echo ""
-            echo -e "  ${YELLOW}Debug:${NC} Status returned: $status"
+            echo -e "  ${YELLOW}Status:${NC} $status"
             return 1
         fi
     else
         print_error "Token không hợp lệ hoặc thiếu quyền cần thiết"
         echo ""
-        local error_msg=$(echo "$response" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
-        echo -e "  ${RED}Chi tiết:${NC} $error_msg"
-        echo -e "  ${YELLOW}Response:${NC} $response"
-        echo ""
-        print_warning "Kiểm tra lại token và permissions theo hướng dẫn trên."
+        local error_msg=$(echo "$body" | grep -o '"message":"[^"]*"' | head -1 | cut -d'"' -f4)
+        local error_code=$(echo "$body" | grep -o '"code":[0-9]*' | head -1 | cut -d: -f2)
         
         if [[ -n "$error_msg" ]]; then
-            echo "  ${RED}Lỗi:${NC} $error_msg"
+            echo -e "  ${RED}Lỗi:${NC} $error_msg (Code: $error_code)"
         fi
+        
         echo ""
-        print_warning "Vui lòng kiểm tra lại token và đảm bảo đầy đủ quyền!"
+        echo -e "  ${YELLOW}Gợi ý khắc phục:${NC}"
+        echo -e "  1. Kiểm tra lại token từ Cloudflare Dashboard"
+        echo -e "  2. Đảm bảo token có đầy đủ 7 quyền đã liệt kê"
+        echo -e "  3. Token chưa hết hạn (check TTL)"
+        echo -e "  4. Zone Resources = 'All zones'"
+        echo ""
+        echo -e "  ${CYAN}Log chi tiết:${NC} /var/log/oziscript/cloudflare_api.log"
         return 1
     fi
 }
