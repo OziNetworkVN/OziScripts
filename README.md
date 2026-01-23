@@ -143,6 +143,51 @@ ozi  # Chọn 2 → 1 → "8.2"
 # Chọn 6 → 2
 ```
 
+### 🔄 Cập nhật Script
+
+#### Phương pháp 1: Từ Menu (Khuyến nghị)
+
+```bash
+ozi
+# Chọn 1 (Thông tin hệ thống)
+# Chọn 8 (Kiểm tra cập nhật script)
+# Nếu có bản mới, chọn "Yes" để cập nhật
+```
+
+**Tính năng Self-Update:**
+- ✅ Tự động backup phiên bản cũ trước khi update
+- ✅ Rollback tự động nếu update lỗi
+- ✅ Giữ nguyên cấu hình và dữ liệu
+
+#### Phương pháp 2: Git Pull
+
+```bash
+# Nếu cài từ Git
+cd /opt/oziscript
+git pull origin main
+
+# Set lại quyền
+chmod +x ozi
+find . -name "*.sh" -exec chmod +x {} \;
+```
+
+### 📦 Thêm Domain Alias
+
+**Nhiều domain cùng trỏ về 1 source code:**
+
+```bash
+ozi
+# Chọn 5 (Quản lý Website)
+# Chọn 6 (Thêm domain alias)
+# Main domain: myapp.com
+# Alias domain: staging.myapp.com
+```
+
+**Use cases:**
+- Production & Staging cùng code
+- Multiple domains (.com, .net, .vn)
+- Dev/Test environments
+
 ### Các tính năng nổi bật
 
 #### 🧠 Tối ưu hóa PHP theo RAM
