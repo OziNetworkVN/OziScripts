@@ -130,6 +130,7 @@ create_origin_certificate() {
     
     local payload
     local private_key=""
+    local csr=""
     
     if [[ "$method" == "2" ]]; then
         # Custom key and CSR
@@ -145,7 +146,7 @@ create_origin_certificate() {
         echo "  Bao gồm cả -----BEGIN CERTIFICATE REQUEST----- và -----END CERTIFICATE REQUEST-----"
         echo ""
         
-        local csr=$(cat)
+        csr=$(cat)
         
         # Validate inputs
         if [[ ! "$private_key" =~ "BEGIN" ]] || [[ ! "$csr" =~ "BEGIN" ]]; then
@@ -157,25 +158,34 @@ create_origin_certificate() {
         echo "$private_key" > "$ssl_dir/key.pem"
         chmod 600 "$ssl_dir/key.pem"
         
-        # Escape newlines for JSON
-        csr=$(echo "$csr" | sed ':a;N;$!ba;s/\n/\\n/g')
+    else
+        # Auto-generate private key and CSR
+        print_info "Đang tạo Private Key và CSR..."
         
-        payload=$(cat << EOF
+        # Generate private key (2048-bit RSA)
+        openssl genrsa -out "$ssl_dir/key.pem" 2048 2>/dev/null
+        chmod 600 "$ssl_dir/key.pem"
+        
+        # Generate CSR
+        openssl req -new -key "$ssl_dir/key.pem" -out "$ssl_dir/csr.pem" \
+            -subj "/C=VN/ST=HCM/L=HoChiMinh/O=OziNetwork/CN=$domain" 2>/dev/null
+        
+        # Read CSR content
+        csr=$(cat "$ssl_dir/csr.pem")
+        
+        print_success "Private Key và CSR đã được tạo"
+    fi
+    
+    # Escape newlines for JSON
+    csr=$(echo "$csr" | sed ':a;N;$!ba;s/\n/\\n/g')
+    
+    # Build payload with CSR
+    payload=$(cat << EOF
 {
     "hostnames": ["$domain", "*.${domain}"],
     "requested_validity": 5475,
     "request_type": "origin-rsa",
     "csr": "$csr"
-}
-EOF
-)
-    else
-        # Auto-generate
-        payload=$(cat << EOF
-{
-    "hostnames": ["$domain", "*.${domain}"],
-    "requested_validity": 5475,
-    "request_type": "origin-rsa"
 }
 EOF
 )
@@ -195,25 +205,11 @@ EOF
     
     # Check if success
     if echo "$response" | grep -q '"success":true'; then
-        # Extract certificate
+        # Extract certificate from response
         local cert=$(echo "$response" | grep -o '"certificate":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
         
-        # If auto-generate, also extract private key
-        if [[ "$method" != "2" ]]; then
-            private_key=$(echo "$response" | grep -o '"private_key":"[^"]*"' | head -1 | cut -d'"' -f4 | sed 's/\\n/\n/g')
-            
-            if [[ -z "$private_key" ]]; then
-                print_error "Không thể trích xuất private key từ response"
-                return 1
-            fi
-            
-            # Save private key
-            echo -e "$private_key" > "$ssl_dir/key.pem"
-            chmod 600 "$ssl_dir/key.pem"
-        fi
-        
         if [[ -z "$cert" ]]; then
-            print_error "Không thể trích xuất certificate"
+            print_error "Không thể trích xuất certificate từ response"
             return 1
         fi
         
