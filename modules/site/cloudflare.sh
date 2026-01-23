@@ -52,21 +52,51 @@ configure_cloudflare_api() {
         return 1
     fi
     
+    # Check internet connectivity first
+    print_info "Kiểm tra kết nối internet..."
+    if ! curl -s --connect-timeout 5 https://api.cloudflare.com/cdn-cgi/trace >/dev/null 2>&1; then
+        print_error "Không thể kết nối đến Cloudflare API"
+        echo ""
+        echo -e "  ${RED}Vui lòng kiểm tra:${NC}"
+        echo -e "  1. Kết nối internet của VPS"
+        echo -e "  2. DNS resolver (cat /etc/resolv.conf)"
+        echo -e "  3. Firewall không block HTTPS"
+        echo ""
+        echo -e "  ${YELLOW}Test thủ công:${NC}"
+        echo -e "  curl -v https://api.cloudflare.com/cdn-cgi/trace"
+        return 1
+    fi
+    
     # Verify token
     print_info "Đang xác thực token..."
     
-    local response=$(curl -s -w "\nHTTP_CODE:%{http_code}" -X GET "${CF_API_URL}/user/tokens/verify" \
+    local response=$(curl -s -X GET "${CF_API_URL}/user/tokens/verify" \
         -H "Authorization: Bearer ${token}" \
-        -H "Content-Type: application/json")
+        -H "Content-Type: application/json" \
+        -w "\nHTTP_STATUS:%{http_code}")
     
-    local http_code=$(echo "$response" | grep "HTTP_CODE:" | cut -d: -f2)
-    local body=$(echo "$response" | sed '/HTTP_CODE:/d')
+    local http_code=$(echo "$response" | grep "HTTP_STATUS:" | cut -d: -f2)
+    local body=$(echo "$response" | sed '/HTTP_STATUS:/d')
     
     # Debug output
-    echo "" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
-    echo "$(date): Token verification" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
-    echo "HTTP Code: $http_code" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
-    echo "Response: $body" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null || true
+    mkdir -p /var/log/oziscript 2>/dev/null
+    echo "" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    echo "$(date): Token verification" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    echo "HTTP Code: $http_code" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    echo "Response: $body" >> /var/log/oziscript/cloudflare_api.log 2>/dev/null
+    
+    if [[ -z "$http_code" || "$http_code" == "000" ]]; then
+        print_error "Không nhận được response từ API (HTTP $http_code)"
+        echo ""
+        echo -e "  ${RED}Nguyên nhân có thể:${NC}"
+        echo -e "  1. Timeout kết nối"
+        echo -e "  2. SSL certificate error"
+        echo -e "  3. Proxy/firewall block"
+        echo ""
+        echo -e "  ${YELLOW}Debug:${NC}"
+        echo -e "  curl -v ${CF_API_URL}/user/tokens/verify"
+        return 1
+    fi
     
     if [[ "$http_code" != "200" ]]; then
         print_error "Kết nối API thất bại (HTTP $http_code)"
