@@ -14,9 +14,32 @@ source "$OZI_DIR/core/config.sh"
 # INSTALLATION
 #================================================================
 
+# Ensure www-data user exists
+ensure_www_data_user() {
+    # Check if www-data user exists
+    if id "www-data" &>/dev/null; then
+        return 0
+    fi
+    
+    print_info "Đang tạo user www-data..."
+    
+    # Create www-data group if not exists
+    if ! getent group www-data >/dev/null 2>&1; then
+        groupadd -r www-data
+    fi
+    
+    # Create www-data user
+    useradd -r -g www-data -s /usr/sbin/nologin -d /var/www -M www-data
+    
+    print_success "User www-data đã được tạo"
+}
+
 # Cài đặt Nginx
 install_nginx() {
     print_header "CÀI ĐẶT NGINX"
+    
+    # Ensure www-data user exists (required for Nginx)
+    ensure_www_data_user
     
     if is_installed "nginx"; then
         print_warning "Nginx đã được cài đặt"

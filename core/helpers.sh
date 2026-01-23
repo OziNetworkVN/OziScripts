@@ -192,6 +192,26 @@ is_service_running() {
     systemctl is-active --quiet "$service"
 }
 
+# Ensure www-data user exists (needed for Nginx/PHP-FPM)
+ensure_www_data_user() {
+    # Check if www-data user exists
+    if id "www-data" &>/dev/null; then
+        return 0
+    fi
+    
+    print_info "Đang tạo user www-data..."
+    
+    # Create www-data group if not exists
+    if ! getent group www-data >/dev/null 2>&1; then
+        groupadd -r www-data
+    fi
+    
+    # Create www-data user
+    useradd -r -g www-data -s /usr/sbin/nologin -d /var/www -M www-data
+    
+    print_success "User www-data đã được tạo"
+}
+
 #================================================================
 # SYSTEM INFO FUNCTIONS
 #================================================================

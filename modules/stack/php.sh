@@ -44,6 +44,26 @@ PHP_EXTENSIONS_EXTRA=(
 # REPOSITORY MANAGEMENT
 #================================================================
 
+# Ensure www-data user exists
+ensure_www_data_user() {
+    # Check if www-data user exists
+    if id "www-data" &>/dev/null; then
+        return 0
+    fi
+    
+    print_info "Đang tạo user www-data..."
+    
+    # Create www-data group if not exists
+    if ! getent group www-data >/dev/null 2>&1; then
+        groupadd -r www-data
+    fi
+    
+    # Create www-data user
+    useradd -r -g www-data -s /usr/sbin/nologin -d /var/www -M www-data
+    
+    print_success "User www-data đã được tạo"
+}
+
 # Thêm Sury PHP repository
 add_sury_repo() {
     if [[ -f /etc/apt/sources.list.d/php.list ]]; then
@@ -93,6 +113,9 @@ install_php() {
     fi
     
     print_header "CÀI ĐẶT PHP ${version}"
+    
+    # Ensure www-data user exists (required for PHP-FPM)
+    ensure_www_data_user
     
     # Add Sury repo if needed
     add_sury_repo
